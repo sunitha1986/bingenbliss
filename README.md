@@ -1,16 +1,33 @@
-# React + Vite
+# Binge N Bliss
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Binge N Bliss is a React and Express application for celebration venue bookings and monthly Lucky Draw entries.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Start the backend:
 
-## React Compiler
+```bash
+cd backend
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Start the frontend in another terminal:
 
-## Expanding the Oxlint configuration
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+The frontend runs on Vite and proxies API requests to the backend at `http://localhost:4000`.
+
+## Backend structure
+
+- `server.js`: HTTP server bootstrap
+- `src/app.js`: Express application setup
+- `src/config/db.js`: JSON store persistence
+- `src/models/luckyDrawModel.js`: user and order data access
+- `src/controllers/luckyDrawController.js`: API request handlers
+- `src/routes/luckyDrawRoutes.js`: API route definitions
+- `src/middleware/errorMiddleware.js`: centralized error responses

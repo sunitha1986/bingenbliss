@@ -1,0 +1,100 @@
+{
+  "users": [
+    {
+      "id": "a90021ad-1c8b-4b47-ab89-5b18ba897a9d",
+      "email": "smoke-1790074039177@example.com",
+      "coupon": "BLISS10",
+      "couponUsed": true,
+      "createdAt": "2026-09-22T10:47:19.882Z"
+    },
+    {
+      "id": "7f70b08f-c263-471e-a488-dc2e8aa57b23",
+      "email": "mohi@gmail.com",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-22T11:10:58.497Z"
+    }
+  ],
+  "orders": [
+    {
+      "id": "cce5a861-58e7-48e8-a18f-a7434ab2d420",
+      "reference": "BNB-039929",
+      "email": "smoke-1790074039177@example.com",
+      "name": "Smoke Test",
+      "phone": "9999999999",
+      "event": "Birthday parties",
+      "date": "2099-01-01",
+      "guests": 2,
+      "amount": 2500,
+      "discount": 250,
+      "total": 2250,
+      "coupon": "BLISS10",
+      "status": "received",
+      "createdAt": "2026-09-22T10:47:19.929Z"
+    },
+    {
+      "id": "7a7ece5b-401b-45b5-a8aa-757d844ed8bf",
+      "reference": "BNB-478361",
+      "email": "mohi@gmail.com",
+      "name": "mohiddin",
+      "phone": "09876543210",
+      "event": "Birthday parties",
+      "date": "2026-09-29",
+      "guests": 2,
+      "amount": 2500,
+      "discount": 0,
+      "total": 2500,
+      "coupon": null,
+      "status": "received",
+      "createdAt": "2026-09-22T11:11:18.361Z"
+    },
+    {
+      "id": "eb35afa5-46d3-47c8-b566-707b2f71462f",
+      "reference": "BNB-612705",
+      "email": "mohi@gmail.com",
+      "name": "mohiddin",
+      "phone": "09876543210",
+      "event": "Birthday parties",
+      "date": "2026-09-29",
+      "guests": 2,
+      "amount": 2500,
+      "discount": 0,
+      "total": 2500,
+      "coupon": null,
+      "status": "received",
+      "createdAt": "2026-09-22T11:13:32.705Z"
+    },
+    {
+      "id": "132e4cb5-e622-4fe4-9de8-2db81bb0106a",
+      "reference": "BNB-832791",
+      "email": "mohi@gmail.com",
+      "name": "mohiddin",
+      "phone": "09876543210",
+      "event": "Birthday parties",
+      "date": "2026-09-29",
+      "guests": 2,
+      "amount": 2500,
+      "discount": 0,
+      "total": 2500,
+      "coupon": null,
+      "status": "received",
+      "createdAt": "2026-09-22T11:17:12.791Z"
+    },
+    {
+      "id": "10776790-a9d2-4209-9b16-7fdb84acc610",
+      "reference": "BNB-203548",
+      "email": "mohi@gmail.com",
+      "name": "Madhu P",
+      "phone": "01234567890",
+      "event": "Birthday parties",
+      "date": "2026-09-24",
+      "guests": 2,
+      "amount": 2500,
+      "discount": 0,
+      "total": 2500,
+      "coupon": null,
+      "status": "received",
+      "createdAt": "2026-09-22T11:23:23.548Z"
+    }
+  ]
+}
