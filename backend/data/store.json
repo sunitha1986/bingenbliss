@@ -13,6 +13,87 @@
       "coupon": "BLISS10",
       "couponUsed": false,
       "createdAt": "2026-09-22T11:10:58.497Z"
+    },
+    {
+      "id": "ef778d0e-b1dd-43ea-a603-c8eca0f776cc",
+      "email": "9876543210@customer.bingenbliss.local",
+      "name": "Suma",
+      "phone": "9876543210",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-25T09:29:58.014Z"
+    },
+    {
+      "id": "9ebdba5e-4540-4f9b-b69f-d3c0c50cbe79",
+      "email": "9177921193@customer.bingenbliss.local",
+      "name": "Sunitha G",
+      "phone": "9177921193",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-26T07:01:59.478Z"
+    },
+    {
+      "id": "89442eb8-928e-4506-8618-f17b418027cc",
+      "email": "8125278527@customer.bingenbliss.local",
+      "name": "Kasarapu Manognya",
+      "phone": "8125278527",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-28T07:15:29.438Z"
+    },
+    {
+      "id": "ca450061-f0da-44e7-b0bb-3876682acdd7",
+      "email": "9686895658@customer.bingenbliss.local",
+      "name": "Karthik Muppidi",
+      "phone": "9686895658",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-28T07:19:02.486Z"
+    },
+    {
+      "id": "94e3272d-58fc-4199-88b8-9ad1b08b41a9",
+      "email": "6303060345@customer.bingenbliss.local",
+      "name": "Kumar",
+      "phone": "6303060345",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-29T06:47:00.557Z"
+    },
+    {
+      "id": "f8bf9468-c951-4f92-9121-7de8eb29b95f",
+      "email": "7013021714@customer.bingenbliss.local",
+      "name": "Aarti Rathore",
+      "phone": "7013021714",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-29T06:47:14.785Z"
+    },
+    {
+      "id": "6ccc9540-273a-492e-87d8-d3c33607650f",
+      "email": "9391866109@customer.bingenbliss.local",
+      "name": "Damodar sri",
+      "phone": "9391866109",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-29T06:47:41.340Z"
+    },
+    {
+      "id": "1fc77e38-1078-4a63-a656-83832c146ffd",
+      "email": "7842304240@customer.bingenbliss.local",
+      "name": "Vijay",
+      "phone": "7842304240",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-29T06:48:15.385Z"
+    },
+    {
+      "id": "f29dbc99-3c0d-4fe8-b421-edb1de02d1d0",
+      "email": "9849967577@customer.bingenbliss.local",
+      "name": "Kalpana",
+      "phone": "9849967577",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-09-29T09:59:23.000Z"
     }
   ],
   "orders": [
@@ -96,5 +177,221 @@
       "status": "received",
       "createdAt": "2026-09-22T11:23:23.548Z"
     }
-  ]
+  ],
+  "luckyDrawSettings": {
+    "wheelEnabled": true,
+    "lastSpin": {
+      "id": "c60a5c00-43d4-4392-9ed8-0a2d4d8587d8",
+      "winner": {
+        "Name": "Aarti Rathore",
+        "Phone": "7013021714",
+        "Occasion": "Birthday party",
+        "Celebration date": "2026-07-21",
+        "Date of birth": "2026-07-21",
+        "Guests": 2,
+        "Consent": "Yes",
+        "Submitted at": "2026-09-29T07:05:56.238Z"
+      },
+      "spunAt": "2026-09-30T07:20:00.603Z"
+    },
+    "winnerHistory": [
+      {
+        "id": "28532fbf-9738-4419-bc34-3c762d3747e6",
+        "winner": {
+          "Name": "Kumar",
+          "Phone": "6303060345",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-10-29",
+          "Date of birth": "2026-10-29",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T06:47:00.537Z"
+        },
+        "spunAt": "2026-09-29T07:11:10.071Z"
+      },
+      {
+        "id": "772c84fc-c3c8-4752-9189-497f58828634",
+        "winner": {
+          "Name": "Karthik Muppidi",
+          "Phone": "9686895658",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-11-16",
+          "Date of birth": "2026-11-16",
+          "Guests": 4,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-28T07:19:02.462Z"
+        },
+        "spunAt": "2026-09-29T08:57:29.396Z"
+      },
+      {
+        "id": "773e47c1-d753-458e-b5de-062792d37aaf",
+        "winner": {
+          "Name": "Sunitha G",
+          "Phone": "9177921193",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-09-30",
+          "Date of birth": "2026-09-30",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T06:35:02.696Z"
+        },
+        "spunAt": "2026-09-29T09:06:01.752Z"
+      },
+      {
+        "id": "d63b2030-4c87-4b06-8913-8ba0ab497b0a",
+        "winner": {
+          "Name": "Damodar sri",
+          "Phone": "9391866109",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-11-22",
+          "Date of birth": "2026-11-22",
+          "Guests": 6,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T06:47:41.316Z"
+        },
+        "spunAt": "2026-09-29T09:06:54.225Z"
+      },
+      {
+        "id": "eac3f4b8-3c30-4407-aedc-56e7c56b63f3",
+        "winner": {
+          "Name": "Aarti Rathore",
+          "Phone": "7013021714",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-07-21",
+          "Date of birth": "2026-07-21",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T07:05:56.238Z"
+        },
+        "spunAt": "2026-09-29T09:07:07.370Z"
+      },
+      {
+        "id": "726250f2-e285-4686-b0a8-774cbf9ed808",
+        "winner": {
+          "Name": "Vijay",
+          "Phone": "7842304240",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-10-21",
+          "Date of birth": "2026-10-21",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T06:48:15.361Z"
+        },
+        "spunAt": "2026-09-30T07:01:08.607Z"
+      },
+      {
+        "id": "3937426e-9b20-4799-ad95-b7d6664a1945",
+        "winner": {
+          "Name": "Kasarapu Manognya",
+          "Phone": "8125278527",
+          "Occasion": "Photography",
+          "Celebration date": "2026-09-22",
+          "Date of birth": "2026-09-22",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-28T07:15:29.378Z"
+        },
+        "spunAt": "2026-09-30T07:01:28.427Z"
+      },
+      {
+        "id": "c96d81e9-7b3e-48ea-bd71-3fff47224a12",
+        "winner": {
+          "Name": "Kalpana",
+          "Phone": "9849967577",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-09-24",
+          "Date of birth": "2026-09-24",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T09:59:22.943Z"
+        },
+        "spunAt": "2026-09-30T07:05:47.972Z"
+      },
+      {
+        "id": "7898c6ae-1ce5-4299-b48a-d0603ea5ad81",
+        "winner": {
+          "Name": "Kalpana",
+          "Phone": "9849967577",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-09-24",
+          "Date of birth": "2026-09-24",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T09:59:22.943Z"
+        },
+        "spunAt": "2026-09-30T07:15:37.672Z"
+      },
+      {
+        "id": "0d7e7171-c129-47ae-ba96-29efee570bdf",
+        "winner": {
+          "Name": "Kalpana",
+          "Phone": "9849967577",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-09-24",
+          "Date of birth": "2026-09-24",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T09:59:22.943Z"
+        },
+        "spunAt": "2026-09-30T07:15:48.631Z"
+      },
+      {
+        "id": "343b0f90-f88f-4830-8aec-22a51533c887",
+        "winner": {
+          "Name": "Aarti Rathore",
+          "Phone": "7013021714",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-07-21",
+          "Date of birth": "2026-07-21",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T07:05:56.238Z"
+        },
+        "spunAt": "2026-09-30T07:19:06.959Z"
+      },
+      {
+        "id": "4e17369b-8dad-44d5-aaeb-c841626b6f31",
+        "winner": {
+          "Name": "Vijay",
+          "Phone": "7842304240",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-10-21",
+          "Date of birth": "2026-10-21",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T06:48:15.361Z"
+        },
+        "spunAt": "2026-09-30T07:19:36.365Z"
+      },
+      {
+        "id": "676d78f4-a922-48d0-bcc9-ff7273d8272e",
+        "winner": {
+          "Name": "Aarti Rathore",
+          "Phone": "7013021714",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-07-21",
+          "Date of birth": "2026-07-21",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T07:05:56.238Z"
+        },
+        "spunAt": "2026-09-30T07:19:47.941Z"
+      },
+      {
+        "id": "c60a5c00-43d4-4392-9ed8-0a2d4d8587d8",
+        "winner": {
+          "Name": "Aarti Rathore",
+          "Phone": "7013021714",
+          "Occasion": "Birthday party",
+          "Celebration date": "2026-07-21",
+          "Date of birth": "2026-07-21",
+          "Guests": 2,
+          "Consent": "Yes",
+          "Submitted at": "2026-09-29T07:05:56.238Z"
+        },
+        "spunAt": "2026-09-30T07:20:00.603Z"
+      }
+    ],
+    "annualEligibilityEnabled": false
+  }
 }

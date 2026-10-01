@@ -1,0 +1,323 @@
+.winner-history-admin-shell {
+  display: flex;
+  min-height: 100vh;
+  background: #28112f;
+  color: #fffafd;
+}
+
+.winner-history-admin-sidebar {
+  background: #1d1422;
+  border-right: 1px solid rgba(255, 250, 253, 0.12);
+  display: flex;
+  flex: 0 0 248px;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 26px 18px 20px;
+}
+
+.winner-history-admin-brand {
+  align-items: center;
+  color: #fffafd;
+  display: flex;
+  font-size: 14px;
+  font-weight: 800;
+  gap: 11px;
+  margin-bottom: 42px;
+}
+
+.winner-history-admin-brand img {
+  background: #fff;
+  border: 2px solid #e879c7;
+  border-radius: 50%;
+  height: 42px;
+  object-fit: cover;
+  width: 42px;
+}
+
+.winner-history-admin-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.winner-history-admin-nav a {
+  border-left: 3px solid transparent;
+  border-radius: 0 4px 4px 0;
+  color: #d7c6dc;
+  font-size: 13px;
+  padding: 12px 12px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.winner-history-admin-nav a:hover,
+.winner-history-admin-nav a.is-active {
+  background: rgba(217, 38, 169, 0.16);
+  border-left-color: #e879c7;
+  color: #fff;
+}
+
+.winner-history-admin-signout {
+  background: transparent;
+  border: 1px solid rgba(240, 166, 220, 0.45);
+  border-radius: 4px;
+  color: #f3c7e8;
+  font-size: 12px;
+  margin-top: auto;
+  padding: 11px 12px;
+  text-align: left;
+}
+
+.winner-history-admin-signout:hover {
+  background: rgba(217, 38, 169, 0.16);
+  color: #fff;
+}
+
+.winner-history-page {
+  flex: 1;
+  background-color: #35133d;
+  background-image:
+    linear-gradient(135deg, rgba(217, 38, 169, 0.18), transparent 45%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.025) 0,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 18px
+    );
+  min-width: 0;
+  min-height: 100vh;
+  padding: 78px max(5vw, 24px) 72px;
+}
+
+.winner-history-content {
+  margin: 0 auto;
+  max-width: 850px;
+}
+
+.winner-history-heading {
+  margin: 0 auto 42px;
+  max-width: 620px;
+  text-align: center;
+}
+
+.winner-history-kicker {
+  color: #f0a6dc;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 1.3px;
+  margin: 0 0 16px;
+}
+
+.winner-history-heading h1 {
+  color: #fffafd;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(42px, 7vw, 68px);
+  font-weight: 600;
+  line-height: 1;
+  margin: 0 0 14px;
+}
+
+.winner-history-heading > p:last-child {
+  color: #e9d5ef;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.winner-history-summary {
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 250, 253, 0.28);
+  color: #f3c7e8;
+  display: flex;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  justify-content: space-between;
+  letter-spacing: 0.8px;
+  margin-bottom: 14px;
+  padding: 0 4px 14px;
+}
+
+.winner-history-summary strong {
+  align-items: center;
+  background: #f8d9f2;
+  border-radius: 50%;
+  color: #701a75;
+  display: inline-flex;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  height: 32px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 32px;
+}
+
+.winner-history-list {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.winner-history-item {
+  align-items: center;
+  background: linear-gradient(105deg, #fffafd, #f8e9fb);
+  border-left: 5px solid #d926a9;
+  border-radius: 5px;
+  color: #35133d;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  min-height: 82px;
+  padding: 15px 22px;
+}
+
+.winner-history-rank {
+  color: #b146a0;
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+}
+
+.winner-history-person h2 {
+  color: #35133d;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
+  margin: 0 0 3px;
+  overflow-wrap: anywhere;
+}
+
+.winner-history-person p {
+  color: #775c7d;
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.winner-history-date {
+  color: #701a75;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.winner-history-status,
+.winner-history-message {
+  background: rgba(255, 250, 253, 0.96);
+  border: 1px solid rgba(248, 217, 242, 0.9);
+  border-radius: 6px;
+  color: #35133d;
+  padding: 28px;
+  text-align: center;
+}
+
+.winner-history-status {
+  color: #701a75;
+  font-size: 14px;
+}
+
+.winner-history-message h2 {
+  color: #701a75;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 25px;
+  margin: 0 0 8px;
+}
+
+.winner-history-message p {
+  color: #775c7d;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 18px;
+}
+
+.winner-history-message a,
+.winner-history-message button {
+  background: linear-gradient(135deg, #d926a9, #7c3aed);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  padding: 11px 20px;
+}
+
+@media (max-width: 640px) {
+  .winner-history-admin-sidebar {
+    align-items: center;
+    flex-basis: auto;
+    flex-direction: row;
+    gap: 12px;
+    min-height: auto;
+    padding: 12px 14px;
+  }
+
+  .winner-history-admin-brand {
+    justify-content: center;
+    margin: 0;
+  }
+
+  .winner-history-admin-brand img {
+    height: 34px;
+    width: 34px;
+  }
+
+  .winner-history-admin-brand span {
+    display: none;
+  }
+
+  .winner-history-admin-nav {
+    display: flex;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .winner-history-admin-nav a {
+    border-bottom: 2px solid transparent;
+    border-left: 0;
+    border-radius: 3px 3px 0 0;
+    flex: 0 0 auto;
+    font-size: 10px;
+    padding: 10px 7px;
+    white-space: nowrap;
+  }
+
+  .winner-history-admin-nav a:hover,
+  .winner-history-admin-nav a.is-active {
+    border-bottom-color: #e879c7;
+    border-left-color: transparent;
+  }
+
+  .winner-history-admin-signout {
+    font-size: 10px;
+    margin: 0;
+    padding: 8px;
+    white-space: nowrap;
+  }
+
+  .winner-history-page {
+    padding: 44px 14px 48px;
+  }
+
+  .winner-history-heading {
+    margin-bottom: 32px;
+  }
+
+  .winner-history-item {
+    gap: 10px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    padding: 14px;
+  }
+
+  .winner-history-date {
+    grid-column: 2;
+    text-align: left;
+    white-space: normal;
+  }
+}

@@ -1,12 +1,113 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { adminLogin } from "../services/api";
 import "../App.css";
 import heroPhoto from "/landing_page/heroIMG.jpg";
 
-const birthdayImage = "/landing_page/birthdayIMG.jpg";
-const theaterImage = "/landing_page/miniTheater.jpg";
-const photographyImage = "/landing_page/photoGraphy.jpg";
+const services = [
+  {
+    title: "Birthday Cake",
+    description: "Customized cakes for special moments.",
+    image: "/landing_page/birthdayCake.jpg",
+    imageAlt: "Celebration cake",
+    icon: "✿",
+  },
+  {
+    title: "Bouquet",
+    description: "Fresh and premium flowers for your loved ones.",
+    image: "/landing_page/boquetImg.png",
+    imageAlt: "Anniversary flower arrangement",
+    icon: "❀",
+  },
+  {
+    title: "Gifts",
+    description: "Surprise gifts and personalized gifts for every occasion.",
+    image: "/landing_page/gifts.jpg",
+    imageAlt: "Wrapped celebration gifts",
+    icon: "◇",
+  },
+  {
+    title: "Decoration",
+    description: "Beautiful and themed decorations for your celebration.",
+    image: "/landing_page/decorationImg.png",
+    imageAlt: "Birthday celebration decorations",
+    icon: "✧",
+  },
+  {
+    title: "Grand Entry",
+    description: "Make your entry special with unique arrangements.",
+    image: "/landing_page/grandEntry.png",
+    imageAlt: "Decorated grand entrance",
+    icon: "☆",
+  },
+  {
+    title: "Photoshoot",
+    description: "Professional photography to capture your memories.",
+    image: "/landing_page/photoShoot.jpg",
+    imageAlt: "Celebration photoshoot",
+    icon: "◉",
+  },
+];
+const celebrationExperiences = [
+  {
+    title: "BirthBliss",
+    description: "For birthdays worth remembering.",
+    image: "/landing_page/decorationImg.png",
+    imageAlt: "Colorful birthday decorations",
+    color: "rose",
+  },
+  {
+    title: "AnniversaryBliss",
+    description: "Celebrate another beautiful year together.",
+    image: "/landing_page/anniversaryDay.jpg",
+    imageAlt: "Anniversary celebration setup",
+    color: "pink",
+  },
+  {
+    title: "LoveBliss",
+    description: "For proposals, surprises and romantic moments.",
+    image: "/landing_page/loveBliss.jpg",
+    imageAlt: "Romantic celebration decor",
+    color: "lavender",
+  },
+  {
+    title: "KidsBliss",
+    description: "Big happiness for little celebrations.",
+    image: "/landing_page/kidsBliss.jpg",
+    imageAlt: "Kids celebration setup",
+    color: "mint",
+  },
+  {
+    title: "Private Screening",
+    description: "Enjoy a private movie screening with your favorite people.",
+    image: "/landing_page/privateMovieScreening.jpg",
+    imageAlt: "Friends enjoying a private movie screening",
+    color: "violet",
+  },
+];
+
+function orderExperiencesAroundSelection(selectedTitle) {
+  if (!selectedTitle) return celebrationExperiences;
+
+  const selectedIndex = celebrationExperiences.findIndex(
+    (experience) => experience.title === selectedTitle,
+  );
+  const centerPosition = Math.floor(celebrationExperiences.length / 2);
+
+  return celebrationExperiences.map((_, position) => {
+    const offset =
+      position < centerPosition
+        ? position + 1
+        : position === centerPosition
+          ? 0
+          : position;
+
+    return celebrationExperiences[
+      (selectedIndex + offset) % celebrationExperiences.length
+    ];
+  });
+}
 
 const celebrationEvents = [
   "Birthday parties",
@@ -17,14 +118,95 @@ const celebrationEvents = [
   "Photography",
 ];
 
+const galleryItems = [
+  {
+    title: "Birthday Bash",
+    category: "Celebration",
+    tagline: "Colourful moments made magical",
+    image: "/landing_page/birthday-gallery.webp",
+    imageAlt: "Birthday celebration gallery",
+  },
+  {
+    title: "Private Screening",
+    category: "Experience",
+    tagline: "Movie nights with a premium touch",
+    image: "/landing_page/screening-gallery.webp",
+    imageAlt: "Private screening gallery",
+  },
+  {
+    title: "Dreamy Decor",
+    category: "Styling",
+    tagline: "Styled spaces that tell a story",
+    image: "/landing_page/gallery-1.webp",
+    imageAlt: "Dreamy decor gallery",
+  },
+  {
+    title: "Grand Arrival",
+    category: "Entrance",
+    tagline: "A dramatic start to the celebration",
+    image: "/landing_page/gallery-2.webp",
+    imageAlt: "Grand arrival decoration",
+  },
+  {
+    title: "Sweet Surprises",
+    category: "Gifts",
+    tagline: "Thoughtful details and heartfelt gifting",
+    image: "/landing_page/gallery-3.webp",
+    imageAlt: "Gift and surprise styling",
+  },
+  {
+    title: "Cinema Glow",
+    category: "Mood",
+    tagline: "Warm, cinematic ambience for every guest",
+    image: "/landing_page/gallery-4.webp",
+    imageAlt: "Cinematic ambience gallery",
+  },
+];
+
+const howItWorksSteps = [
+  {
+    id: 1,
+    icon: "📅",
+    title: "Register Your Date",
+    description: "Tell us about your upcoming special occasion.",
+  },
+  {
+    id: 2,
+    icon: "🎁",
+    title: "Enter the Monthly Draw",
+    description:
+      "Your registration is eligible for the monthly celebration draw.",
+  },
+  {
+    id: 3,
+    icon: "📣",
+    title: "Winner Announcement",
+    description:
+      "We announce the selected entrant through our social channels.",
+  },
+  {
+    id: 4,
+    icon: "🎉",
+    title: "Celebrate at Bingebliss",
+    description:
+      "The winner receives free celebration hours according to the terms.",
+  },
+];
+
 function LandingPage() {
   const [celebrationIndex, setCelebrationIndex] = useState(0);
+  const [selectedExperience, setSelectedExperience] = useState(null);
+  const [selectedStep, setSelectedStep] = useState(1);
+  const [registrationActive, setRegistrationActive] = useState(false);
   const [user, setUser] = useState(() => {
     const savedUser = window.localStorage.getItem("bnb-user");
     return savedUser ? JSON.parse(savedUser) : null;
   });
   const [activeModal, setActiveModal] = useState(null);
+  const [loginRole, setLoginRole] = useState("customer");
   const [email, setEmail] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [orderAmount, setOrderAmount] = useState("2500");
   const [coupon, setCoupon] = useState("");
   const [couponMessage, setCouponMessage] = useState("");
@@ -40,12 +222,26 @@ function LandingPage() {
   const [confirmation, setConfirmation] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [activeGalleryIndex, setActiveGalleryIndex] = useState(
+    galleryItems.length,
+  );
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartX = useRef(0);
+  const dragDistance = useRef(0);
+  const galleryRef = useRef(null);
   const discount = isCouponApplied ? Number(orderAmount || 0) * 0.1 : 0;
   const total = Math.max(Number(orderAmount || 0) - discount, 0);
+  const orderedExperiences =
+    orderExperiencesAroundSelection(selectedExperience);
+  const repeatedGalleryItems = useMemo(
+    () => [...galleryItems, ...galleryItems, ...galleryItems],
+    [],
+  );
 
   const openLogin = (returnToBooking = false) => {
     setPendingBooking(returnToBooking);
     setActiveModal("login");
+    setLoginRole("customer");
     setCouponMessage("");
     setFormError("");
   };
@@ -58,14 +254,29 @@ function LandingPage() {
     setActiveModal("order");
   };
 
+  const handleRegistrationClick = () => {
+    setRegistrationActive(true);
+    openLogin();
+  };
+
   const handleLogin = async (event) => {
     event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) return;
-
     setIsSubmitting(true);
     setFormError("");
     try {
+      if (loginRole === "admin") {
+        const result = await adminLogin({
+          email: adminEmail.trim(),
+          password: adminPassword,
+        });
+        window.localStorage.setItem("bnb-admin-token", result.token);
+        window.localStorage.removeItem("bnb-user");
+        window.location.href = "/admin/lucky-draw";
+        return;
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!normalizedEmail) return;
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -135,6 +346,69 @@ function LandingPage() {
     }));
   };
 
+  const scrollGallery = (direction) => {
+    setActiveGalleryIndex((currentIndex) => {
+      const nextIndex = currentIndex + direction;
+      if (nextIndex >= galleryItems.length * 2) {
+        return galleryItems.length;
+      }
+      if (nextIndex < galleryItems.length) {
+        return galleryItems.length;
+      }
+      return nextIndex;
+    });
+  };
+
+  useEffect(() => {
+    if (isDragging) return undefined;
+
+    const galleryTimer = window.setInterval(() => {
+      setActiveGalleryIndex((currentIndex) => {
+        const nextIndex = currentIndex + 1;
+        if (nextIndex >= galleryItems.length * 2) {
+          return galleryItems.length;
+        }
+        return nextIndex;
+      });
+    }, 2500);
+
+    return () => window.clearInterval(galleryTimer);
+  }, [galleryItems.length, isDragging]);
+
+  useEffect(() => {
+    if (activeGalleryIndex < galleryItems.length) {
+      setActiveGalleryIndex(galleryItems.length);
+    }
+    if (activeGalleryIndex >= galleryItems.length * 2) {
+      setActiveGalleryIndex(galleryItems.length);
+    }
+  }, [activeGalleryIndex, galleryItems.length]);
+
+  const handlePointerDown = (event) => {
+    setIsDragging(true);
+    dragStartX.current = event.clientX;
+    dragDistance.current = 0;
+  };
+
+  const handlePointerMove = (event) => {
+    if (!isDragging) return;
+    dragDistance.current = event.clientX - dragStartX.current;
+  };
+
+  const handlePointerUp = () => {
+    if (!isDragging) return;
+
+    const threshold = 45;
+    if (dragDistance.current > threshold) {
+      scrollGallery(-1);
+    } else if (dragDistance.current < -threshold) {
+      scrollGallery(1);
+    }
+
+    setIsDragging(false);
+    dragDistance.current = 0;
+  };
+
   const handleOrderSubmit = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
@@ -168,11 +442,19 @@ function LandingPage() {
   };
 
   useEffect(() => {
-    const featureRows = document.querySelectorAll(".feature-row");
-    if (!("IntersectionObserver" in window)) {
-      featureRows.forEach((row) => row.classList.add("is-visible"));
-      return undefined;
-    }
+    const phraseTimer = window.setInterval(() => {
+      setCelebrationIndex(
+        (currentIndex) => (currentIndex + 1) % celebrationEvents.length,
+      );
+    }, 5600);
+
+    return () => window.clearInterval(phraseTimer);
+  }, []);
+
+  useEffect(() => {
+    const revealCards = document.querySelectorAll(".service-reveal-card");
+
+    if (!revealCards.length) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -184,25 +466,19 @@ function LandingPage() {
           }
         });
       },
-      { rootMargin: "-8% 0px -8% 0px", threshold: [0, 0.15] },
+      { threshold: 0.15 },
     );
 
-    featureRows.forEach((row) => observer.observe(row));
+    revealCards.forEach((card) => observer.observe(card));
 
-    return () => {
-      observer.disconnect();
-    };
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
-    const phraseTimer = window.setInterval(() => {
-      setCelebrationIndex(
-        (currentIndex) => (currentIndex + 1) % celebrationEvents.length,
-      );
-    }, 5600);
-
-    return () => window.clearInterval(phraseTimer);
-  }, []);
+    if (!activeModal) {
+      setRegistrationActive(false);
+    }
+  }, [activeModal]);
 
   return (
     <main
@@ -264,70 +540,171 @@ function LandingPage() {
         </div>
       </section>
 
-      <section className="know-more-section" id="events">
-        <div className="know-more-heading">
-          <p className="eyebrow dark">Know more</p>
-          <h2>
-            Celebrate the moments
-            <br />
-            <em>that matter most.</em>
+      <section
+        className="celebration-experiences"
+        id="events"
+        aria-labelledby="experiences-title"
+      >
+        <div className="celebration-experiences-heading">
+          <div>
+            <p className="experience-eyebrow">What are you celebrating?</p>
+            <h2 id="experiences-title">
+              Choose <span>Your Bliss</span>
+            </h2>
+          </div>
+        </div>
+        <div className="celebration-experiences-grid">
+          {orderedExperiences.map((experience, index) => (
+            <button
+              className={`celebration-experience-card bliss-${experience.color} ${selectedExperience === experience.title ? "selected" : ""} ${index === Math.floor(orderedExperiences.length / 2) ? "center-card" : ""}`}
+              key={experience.title}
+              onClick={() => setSelectedExperience(experience.title)}
+              type="button"
+              aria-label={`Select ${experience.title}`}
+              aria-pressed={selectedExperience === experience.title}
+            >
+              <img
+                src={experience.image}
+                alt={experience.imageAlt}
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="bliss-card-copy">
+                <h3>{experience.title}</h3>
+                <p>{experience.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section
+        className="how-it-works-section"
+        aria-labelledby="how-it-works-title"
+      >
+        <div className="how-it-works-header">
+          <p className="how-it-works-label">Simple Steps</p>
+          <h2 id="how-it-works-title">
+            How It <span>Works</span>
           </h2>
+          <button
+            className={`register-cta ${registrationActive ? "selected" : ""}`}
+            onClick={handleRegistrationClick}
+            type="button"
+            aria-pressed={registrationActive}
+          >
+            Registration
+          </button>
         </div>
-        <div className="feature-row feature-row-text-first">
-          <div className="feature-copy">
-            <p className="eyebrow dark">Big-screen memories</p>
-            <h3>
-              Celebrate your precious moments with our unique big screens along
-              with your loved ones.
-            </h3>
-            <p>
-              Settle into a private theatre made for birthdays, anniversaries,
-              and every gathering that deserves a little more wonder. Your
-              people, your movie, your moment.
-            </p>
-          </div>
-          <div className="feature-image-wrap">
-            <img
-              src={birthdayImage}
-              alt="Birthday celebration in a private theatre"
-            />
-          </div>
+
+        <div className="how-it-works-steps">
+          {howItWorksSteps.map((step) => (
+            <button
+              key={step.id}
+              className={`how-it-works-step ${selectedStep === step.id ? "selected" : ""}`}
+              onClick={() => {
+                setSelectedStep(step.id);
+                setRegistrationActive(true);
+              }}
+              type="button"
+              aria-pressed={selectedStep === step.id}
+            >
+              <div className="step-badge">{step.id}</div>
+              <div className="step-icon" aria-hidden="true">
+                {step.icon}
+              </div>
+              <h3>{step.title}</h3>
+              <p>{step.description}</p>
+            </button>
+          ))}
         </div>
-        <div className="feature-row feature-row-image-first">
-          <div className="feature-image-wrap">
-            <img
-              src={theaterImage}
-              alt="Private theatre with comfortable cinema seating"
-            />
-          </div>
-          <div className="feature-copy">
-            <p className="eyebrow dark">Your private screen</p>
-            <h3>
-              More than a venue. A beautiful setting for the people you love.
-            </h3>
-            <p>
-              From warm lighting to immersive sound, every detail is shaped
-              around a relaxed, memorable experience that feels completely
-              yours.
-            </p>
-          </div>
+      </section>
+
+      <section className="experience-section" aria-label="Our services">
+        <div className="experience-heading-row">
+          <p className="experience-eyebrow">Our services</p>
+          <h2 className="experience-title">
+            Everything you need for your <span>celebration</span>
+          </h2>
+          <p className="experience-note">
+            From beautiful setups to unforgettable moments, we take care of
+            every detail to make your special day truly memorable.
+          </p>
         </div>
-        <div className="feature-row feature-row-text-first">
-          <div className="feature-copy">
-            <p className="eyebrow dark">Keep the memory</p>
-            <h3>Turn every celebration into a story worth looking back on.</h3>
-            <p>
-              Bring your best looks, your favorite people, and your biggest
-              moments. Our photography experience gives every memory its own
-              spotlight.
-            </p>
-          </div>
-          <div className="feature-image-wrap">
-            <img
-              src={photographyImage}
-              alt="Photography session in a bright studio"
-            />
-          </div>
+
+        <div className="experience-grid">
+          {services.map((service, index) => (
+            <article
+              className="experience-card service-reveal-card"
+              key={service.title}
+              style={{ "--reveal-delay": `${index * 120}ms` }}
+            >
+              <img
+                className="card-image"
+                src={service.image}
+                alt={service.imageAlt}
+              />
+              <div className="card-copy">
+                <span className="service-icon" aria-hidden="true">
+                  {service.icon}
+                </span>
+                <div className="service-description">
+                  <h3>{service.title}</h3>
+                  <p>{service.description}</p>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="gallery-section" aria-labelledby="gallery-title">
+        <div className="gallery-header">
+          <h2 id="gallery-title">Gallery</h2>
+        </div>
+
+        <div
+          className="gallery-slider"
+          ref={galleryRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
+          {repeatedGalleryItems.map((item, index) => {
+            const relativeIndex = index - activeGalleryIndex;
+            const wrappedIndex =
+              relativeIndex > galleryItems.length / 2
+                ? relativeIndex - galleryItems.length
+                : relativeIndex < -galleryItems.length / 2
+                  ? relativeIndex + galleryItems.length
+                  : relativeIndex;
+            const isActive = wrappedIndex === 0;
+            const distance = Math.abs(wrappedIndex);
+
+            return (
+              <article
+                className={`gallery-card ${isActive ? "active" : ""}`}
+                key={`${item.title}-${index}`}
+                style={{
+                  transform: `translate(-50%, -50%) translateX(${wrappedIndex * 150}px) scale(${isActive ? 1 : Math.max(0.76, 1 - distance * 0.08)})`,
+                  opacity: isActive ? 1 : Math.max(0.45, 1 - distance * 0.14),
+                  zIndex: isActive ? 20 : 10 - distance,
+                  filter: isActive
+                    ? "brightness(1) saturate(1.02)"
+                    : "brightness(0.74) saturate(0.8)",
+                }}
+              >
+                <img src={item.image} alt={item.imageAlt} loading="lazy" />
+                <div className="gallery-card-overlay">
+                  <span>{item.category}</span>
+                  <h3>{item.title}</h3>
+                  <p>{item.tagline}</p>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
 
@@ -356,28 +733,87 @@ function LandingPage() {
             {activeModal === "login" ? (
               <>
                 <p className="eyebrow dark">Member access</p>
-                <h2>Unlock your BNB coupon.</h2>
+                <div className="login-role-toggle" aria-label="Login type">
+                  <button
+                    className={loginRole === "customer" ? "is-active" : ""}
+                    onClick={() => {
+                      setLoginRole("customer");
+                      setFormError("");
+                    }}
+                    type="button"
+                  >
+                    Customer
+                  </button>
+                  <button
+                    className={loginRole === "admin" ? "is-active" : ""}
+                    onClick={() => {
+                      setLoginRole("admin");
+                      setFormError("");
+                    }}
+                    type="button"
+                  >
+                    Admin
+                  </button>
+                </div>
+                <h2>
+                  {loginRole === "admin"
+                    ? "Admin access."
+                    : "Unlock your BNB coupon."}
+                </h2>
                 <p>
-                  Sign in with your email and we&apos;ll create your personal
-                  10% code.
+                  {loginRole === "admin"
+                    ? "Sign in to manage the lucky draw."
+                    : "Sign in with your email and we’ll create your personal 10% code."}
                 </p>
                 <form className="modal-form" onSubmit={handleLogin}>
-                  <label htmlFor="login-email">Email address</label>
-                  <input
-                    id="login-email"
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="you@example.com"
-                    required
-                  />
+                  {loginRole === "admin" ? (
+                    <>
+                      <label htmlFor="login-admin-email">Admin email</label>
+                      <input
+                        id="login-admin-email"
+                        type="email"
+                        value={adminEmail}
+                        onChange={(event) => setAdminEmail(event.target.value)}
+                        placeholder="admin@bingenbliss.com"
+                        required
+                      />
+                      <label htmlFor="login-admin-password">Password</label>
+                      <input
+                        id="login-admin-password"
+                        type="password"
+                        value={adminPassword}
+                        onChange={(event) =>
+                          setAdminPassword(event.target.value)
+                        }
+                        placeholder="Admin password"
+                        required
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <label htmlFor="login-email">Email address</label>
+                      <input
+                        id="login-email"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder="you@example.com"
+                        required
+                      />
+                    </>
+                  )}
                   {formError && <p className="form-error">{formError}</p>}
                   <button
                     className="dark-button"
                     disabled={isSubmitting}
                     type="submit"
                   >
-                    {isSubmitting ? "Signing in..." : "Continue"} <span>↗</span>
+                    {isSubmitting
+                      ? "Signing in..."
+                      : loginRole === "admin"
+                        ? "Sign in"
+                        : "Continue"}{" "}
+                    <span>↗</span>
                   </button>
                 </form>
               </>

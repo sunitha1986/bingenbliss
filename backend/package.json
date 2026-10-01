@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
+    "db:migrate-excel": "node src/scripts/migrateLuckyDrawExcel.js",
     "lint": "oxlint server.js src"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "dotenv": "^18.0.3",
+    "express": "^5.1.0",
+    "mysql2": "^3.24.5"
   },
   "devDependencies": {
-    "oxlint": "^1.81.0"
+    "oxlint": "^1.81.0",
+    "xlsx": "^0.18.5"
   }
 }

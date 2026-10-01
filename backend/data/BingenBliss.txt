@@ -1,0 +1,98 @@
+Binge and Bliss:
+I have thoroughly analyzed the Binge N Bliss codebase. Here is a comprehensive overview of the architecture, key components, data flow, and features.
+
+1. Overview & Architecture
+Binge N Bliss is a full-stack web application designed for celebrating venue bookings and managing a monthly Lucky Draw system.
+
+Architecture: Separated Frontend (/frontend) and Backend (/backend).
+Frontend: Built with React 19, Vite 8, and Vanilla CSS (App.css), using native fetch for API calls.
+Backend: Built with Express 5 (Node.js ES modules), using JSON files (store.json) and Excel sheets (lucky-draw-customers.xlsx) for lightweight data persistence.
+2. Frontend Structure (/frontend)
+Pages & Navigation (App.jsx)
+App navigation relies on simple pathname conditional rendering:
+
+Path	Component	Description
+/	
+
+LandingPage.jsx
+Main landing page showcasing venues, dynamic ticker, booking flow & member coupon application.
+/lucky-draw	
+
+LuckyDraw.jsx
+Public entry form for monthly draws & live reveal view when enabled by admin.
+/admin/lucky-draw	
+
+AdminLuckyDraw.jsx
+Admin dashboard to launch the lucky draw spin, select winners, and toggle public draw visibility.
+/admin/customers	
+
+AdminCustomers.jsx
+Admin table interface to view, edit, or delete entries stored in the Excel workbook.
+Key Features & UI Components:
+Dynamic Celebration Ticker: Rotates event types (Birthday parties, Anniversary days, Private theatre, etc.) in the hero section.
+Booking & Coupon System: Computes 10% discount on orders when member coupon (BLISS10) is validated.
+Real-Time Draw Status Polling: LuckyDraw.jsx polls /api/lucky-draw/status every 1 second to automatically animate and present winner announcements when triggered by admin.
+API Service Layer: 
+
+api.js
+ centralizes all REST API calls to the backend via Vite's proxy (/api -> http://localhost:4000).
+3. Backend Structure (/backend)
+Routes & Controllers
+Routes (src/routes/luckyDrawRoutes.js):
+POST /api/auth/login: Authenticates or registers customers using a 10-digit phone number or email.
+POST /api/coupons/validate: Validates member coupons and returns calculated discounts.
+POST /api/orders: Receives booking requests and stores them in orders.
+POST /api/lucky-draw & GET /api/lucky-draw/status: Customer lucky draw entries & status checks.
+POST /api/admin/login: Admin authentication verifying ADMIN_EMAIL and ADMIN_PASSWORD.
+POST /api/admin/lucky-draw/spin: Selects a random winner, records the spin state, and attempts WhatsApp notification.
+GET/PUT/DELETE /api/admin/customers: CRUD endpoints for Excel data management.
+Data Storage & Integrations
+JSON Data Persistence (
+
+db.js
+): Stores users, orders, and luckyDrawSettings inside backend/data/store.json.
+Excel Workbook Operations (
+
+luckyDrawExcel.js
+): Uses xlsx (SheetJS) to manage backend/data/lucky-draw-customers.xlsx. Includes conflict handling for EBUSY/EPERM errors when Excel is opened locally.
+WhatsApp Cloud API Integration (
+
+whatsapp.js
+):
+Automatically formats 10-digit Indian numbers with 91 country code.
+Attempts to send a WhatsApp notification via Facebook Graph API (v21.0).
+Fallback: Generates a prefilled wa.me link so the admin can open WhatsApp directly and send the message manually.
+4. Running the Project Locally
+Backend:
+bash
+cd backend
+npm run dev    # runs `node --watch server.js` on port 4000
+Frontend:
+bash
+cd frontend
+npm run dev    # runs Vite dev server on port 5173
+NOTE
+
+Running npm run start inside frontend throws Missing script: "start" because Vite projects use npm run dev for development and npm run build / npm run preview for production builds.
+
+
+https://pngtree.com/pay/pay-event-page?b=51
+
+
+
+https://mysql.site4now.net/index.php?route=/table/import&db=db_a26f8d_troy&table=states\
+
+Database 
+
+db name -  db_ac5b80_binge
+uname - ac5b80_binge
+pass - Binge@2026
+host - mysql5036.site4now.net
+
+
+FTP
+uname --  bingenbliss
+password -  Binge@2026
+host -- win8153.site4now.net
+
+https://bingenbliss.vasmigroup.com

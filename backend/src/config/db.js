@@ -6,7 +6,14 @@ const currentFile = fileURLToPath(import.meta.url);
 const dataDirectory = path.resolve(path.dirname(currentFile), "../../data");
 const dataFile = path.join(dataDirectory, "store.json");
 
-const emptyStore = { users: [], orders: [] };
+const emptyStore = {
+  users: [],
+  orders: [],
+  luckyDrawSettings: {
+    wheelEnabled: false,
+    annualEligibilityEnabled: true,
+  },
+};
 
 export async function readStore() {
   try {
