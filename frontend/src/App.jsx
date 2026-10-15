@@ -6,9 +6,13 @@ import AdminCustomers from "./pages/AdminCustomers";
 import AdminOccasions from "./pages/AdminOccasions";
 import LuckyDraw from "./pages/LuckyDraw";
 import WinnerHistory from "./pages/WinnerHistory";
+import { useLocation  } from "react-router-dom";
 
 function App() {
-  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  // const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+    const { pathname: currentPath } = useLocation();
+   const pathname = currentPath.replace(/\/+$/, "") || "/";
+   
   const isAdminRoute =
     pathname === "/admin" ||
     pathname === "/admin/lucky-draw" ||

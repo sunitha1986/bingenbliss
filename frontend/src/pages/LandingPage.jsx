@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { testAdminCredentials } from "../testCredentials";
+import {useNavigate} from "react-router-dom"
 import {
   adminLogin,
   createOrder,
@@ -105,7 +106,9 @@ const celebrationExperiences = [
     imageAlt: "Friends enjoying a private movie screening",
     color: "violet",
   },
+  
 ];
+
 function orderExperiencesAroundSelection(selectedTitle) {
   if (!selectedTitle) return celebrationExperiences;
 
@@ -274,6 +277,8 @@ const howItWorksSteps = [
 ];
 
 function LandingPage() {
+  
+  const navigate = useNavigate()
   const [celebrationIndex, setCelebrationIndex] = useState(0);
   const [selectedExperience, setSelectedExperience] = useState(null);
   const [selectedStep, setSelectedStep] = useState(1);
@@ -411,7 +416,10 @@ function LandingPage() {
 
   const handleRegistrationClick = () => {
     setRegistrationActive(true);
-    openLogin();
+    // openLogin();
+    console.log('inside the handle click')
+    navigate("/lucky-draw")
+    
   };
 
   const handleLogin = async (event) => {
@@ -792,11 +800,12 @@ function LandingPage() {
         <div className="how-it-works-header">
           <p className="how-it-works-label">Simple Steps</p>
           <h2 id="how-it-works-title">
-            How It <span>Works</span>
+            Lucky Draw - How It <span>Works</span>
           </h2>
           <button
             className={`register-cta ${registrationActive ? "selected" : ""} ${stepChangeGlow ? "step-change-glow" : ""}`}
             onClick={handleRegistrationClick}
+    
             type="button"
             aria-pressed={registrationActive}
           >
