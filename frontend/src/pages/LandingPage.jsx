@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { adminLogin } from "../services/api";
+import { testAdminCredentials } from "../testCredentials";
+import {
+  adminLogin,
+  createOrder,
+  getLuckyDrawLatestWinner,
+  lookupCustomerRegistration,
+  validateCoupon,
+  verifyCustomerLogin,
+} from "../services/api";
 import "../App.css";
+import "./LandingPage.css";
 import heroPhoto from "/landing_page/heroIMG.jpg";
 
 const services = [
@@ -49,6 +58,17 @@ const services = [
     icon: "◉",
   },
 ];
+const sampleReviews = [
+  {
+    text: "Beautiful decorations and thoughtful details made our celebration feel truly special. The team was helpful from start to finish.",
+  },
+  {
+    text: "Everything was well organised and the setup looked amazing. Our family had a wonderful time celebrating together.",
+  },
+  {
+    text: "Friendly service and lovely arrangements. They made planning our special occasion easy and memorable.",
+  },
+];
 const celebrationExperiences = [
   {
     title: "BirthBliss",
@@ -86,7 +106,6 @@ const celebrationExperiences = [
     color: "violet",
   },
 ];
-
 function orderExperiencesAroundSelection(selectedTitle) {
   if (!selectedTitle) return celebrationExperiences;
 
@@ -95,18 +114,79 @@ function orderExperiencesAroundSelection(selectedTitle) {
   );
   const centerPosition = Math.floor(celebrationExperiences.length / 2);
 
-  return celebrationExperiences.map((_, position) => {
-    const offset =
-      position < centerPosition
-        ? position + 1
-        : position === centerPosition
-          ? 0
-          : position;
+  return Array.from({ length: celebrationExperiences.length }, (_, offset) => {
+    const nextIndex =
+      (selectedIndex +
+        offset -
+        centerPosition +
+        celebrationExperiences.length) %
+      celebrationExperiences.length;
 
-    return celebrationExperiences[
-      (selectedIndex + offset) % celebrationExperiences.length
-    ];
+    return celebrationExperiences[nextIndex];
   });
+}
+
+function formatDrawDate(drawDate) {
+  const [year, month, day] = drawDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString(
+    undefined,
+    {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    },
+  );
+}
+
+function formatDrawTime(time) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return new Date(Date.UTC(2000, 0, 1, hours, minutes)).toLocaleTimeString(
+    undefined,
+    {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }
+  );
+}
+
+function formatNextDrawDate(drawDate, drawTime) {
+  const formattedDate = formatDrawDate(drawDate);
+  const formattedTime = drawTime ? ` at ${formatDrawTime(drawTime)}` : "";
+  return `${formattedDate}${formattedTime}`;
+}
+
+function formatCustomerProfileDate(date) {
+  if (!date) return "Not provided";
+  const [year, month, day] = date.split("-").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day, 12));
+  return Number.isFinite(value.getTime())
+    ? value.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    })
+    : "Not provided";
+}
+
+function formatCustomerRegistrationTime(value) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? `${date.toLocaleString("en-IN", {
+      dateStyle: "long",
+      timeStyle: "short",
+      timeZone: "Asia/Kolkata",
+    })} IST`
+    : "Not available";
+}
+
+function normalizeCustomerPhone(phone) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1);
+  return digits;
 }
 
 const celebrationEvents = [
@@ -197,6 +277,9 @@ function LandingPage() {
   const [celebrationIndex, setCelebrationIndex] = useState(0);
   const [selectedExperience, setSelectedExperience] = useState(null);
   const [selectedStep, setSelectedStep] = useState(1);
+  const [stepChangeGlow, setStepChangeGlow] = useState(false);
+  const hasStepChanged = useRef(false);
+  const experienceCardRefs = useRef({});
   const [registrationActive, setRegistrationActive] = useState(false);
   const [user, setUser] = useState(() => {
     const savedUser = window.localStorage.getItem("bnb-user");
@@ -204,7 +287,12 @@ function LandingPage() {
   });
   const [activeModal, setActiveModal] = useState(null);
   const [loginRole, setLoginRole] = useState("customer");
-  const [email, setEmail] = useState("");
+  const [customerLoginStep, setCustomerLoginStep] = useState("phone");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerOtp, setCustomerOtp] = useState("");
+  const [customerProfile, setCustomerProfile] = useState(null);
+  const [customerNeedsRegistration, setCustomerNeedsRegistration] =
+    useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [orderAmount, setOrderAmount] = useState("2500");
@@ -237,21 +325,88 @@ function LandingPage() {
     () => [...galleryItems, ...galleryItems, ...galleryItems],
     [],
   );
+  const [monthlyDraw, setMonthlyDraw] = useState(null);
+  const [monthlyDrawSlide, setMonthlyDrawSlide] = useState(0);
+  const nextDrawDate =
+    monthlyDraw?.drawConfigurationReady && monthlyDraw.drawDate
+      ? formatNextDrawDate(monthlyDraw.drawDate, monthlyDraw.drawTime)
+      : "Date to be announced";
+  const isMobileGallery =
+    typeof window !== "undefined" && window.innerWidth <= 480;
+  const monthlyDrawSlideCount = monthlyDraw?.lastWinnerName ? 2 : 1;
+
+  useEffect(() => {
+    if (monthlyDrawSlideCount < 2) return undefined;
+
+    const slideTimer = window.setTimeout(() => {
+      setMonthlyDrawSlide(
+        (currentSlide) => (currentSlide + 1) % monthlyDrawSlideCount,
+      );
+    }, 2000);
+
+    return () => window.clearTimeout(slideTimer);
+  }, [monthlyDrawSlide, monthlyDrawSlideCount]);
+  useEffect(() => {
+    let isActive = true;
+
+    const refreshMonthlyDraw = async () => {
+      try {
+        const status = await getLuckyDrawLatestWinner();
+        if (isActive) {
+          setMonthlyDraw({
+            wheelEnabled: status.wheelEnabled === true,
+            lastWinnerName: status.lastWinnerName || "",
+            lastWinnerMonth: status.lastWinnerMonth || "",
+          });
+          if (status?.winner) {
+            const w = status.winner;
+            try {
+              window.localStorage.setItem(
+                "bnb-lucky-draw-latest-winner",
+                JSON.stringify({
+                  id: `${w.Name || w.name}-${w.Phone || w.phone || ""}`,
+                  name: w.Name || w.name || status.lastWinnerName || "Lucky Winner",
+                  phone: w.Phone || w.phone || "",
+                  date: w.date || w.dob || w["Date of birth"] || "",
+                  occasion: w.occasion || w.Occasion || "Special Celebration",
+                }),
+              );
+            } catch { }
+          }
+        }
+      } catch { }
+    };
+
+    refreshMonthlyDraw();
+    window.addEventListener("focus", refreshMonthlyDraw);
+
+    return () => {
+      isActive = false;
+      window.removeEventListener("focus", refreshMonthlyDraw);
+    };
+  }, []);
 
   const openLogin = (returnToBooking = false) => {
     setPendingBooking(returnToBooking);
     setActiveModal("login");
     setLoginRole("customer");
+    setCustomerLoginStep("phone");
+    setCustomerPhone("");
+    setCustomerOtp("");
+    setCustomerNeedsRegistration(false);
     setCouponMessage("");
     setFormError("");
   };
 
-  const openBooking = () => {
-    if (!user) {
-      openLogin(true);
-      return;
-    }
-    setActiveModal("order");
+  const handleExperienceSelection = (title) => {
+    setSelectedExperience(title);
+    requestAnimationFrame(() => {
+      experienceCardRefs.current[title]?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    });
   };
 
   const handleRegistrationClick = () => {
@@ -271,25 +426,57 @@ function LandingPage() {
         });
         window.localStorage.setItem("bnb-admin-token", result.token);
         window.localStorage.removeItem("bnb-user");
-        window.location.href = "/admin/lucky-draw";
+        window.location.href = "/admin";
         return;
       }
 
-      const normalizedEmail = email.trim().toLowerCase();
-      if (!normalizedEmail) return;
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      setUser(result.user);
-      window.localStorage.setItem("bnb-user", JSON.stringify(result.user));
-      setCoupon(result.user.coupon);
-      setActiveModal(pendingBooking ? "order" : null);
-      setPendingBooking(false);
+      const normalizedPhone = normalizeCustomerPhone(customerPhone);
+      if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
+        throw new Error("Enter a valid 10-digit Indian WhatsApp number.");
+      }
+
+      if (customerLoginStep === "phone") {
+        const result = await lookupCustomerRegistration(normalizedPhone);
+        if (!result.registered) {
+          setCustomerNeedsRegistration(true);
+          setFormError(
+            "This number is not registered yet. Register to join the lucky draw.",
+          );
+          return;
+        }
+        if (!import.meta.env.DEV) {
+          setFormError(
+            "This number is registered, but secure OTP sign-in is not enabled in production yet.",
+          );
+          return;
+        }
+        setCustomerNeedsRegistration(false);
+        setCustomerLoginStep("otp");
+        setFormError("");
+        return;
+      }
+
+      const result = await verifyCustomerLogin(
+        normalizedPhone,
+        customerOtp,
+      );
+      if (!result.profile) {
+        throw new Error("Your registration details could not be loaded.");
+      }
+      const customerUser = {
+        ...result.user,
+        profile: result.profile,
+        customerVerified: true,
+      };
+      setUser(customerUser);
+      window.localStorage.setItem("bnb-user", JSON.stringify(customerUser));
+      setCoupon(result.user.coupon || "");
+      setCustomerProfile(result.profile);
+      setActiveModal("customer-profile");
     } catch (error) {
+      if (error.message.includes("not registered")) {
+        setCustomerNeedsRegistration(true);
+      }
       setFormError(error.message || "Unable to sign in");
     } finally {
       setIsSubmitting(false);
@@ -314,17 +501,11 @@ function LandingPage() {
     setIsSubmitting(true);
     setFormError("");
     try {
-      const response = await fetch("/api/coupons/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: user.email,
-          code: coupon,
-          amount: Number(orderAmount),
-        }),
+      const result = await validateCoupon({
+        email: user.email,
+        code: coupon,
+        amount: Number(orderAmount),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
       setIsCouponApplied(true);
       setCouponMessage(
         `10% discount applied (₹${result.discount.toLocaleString("en-IN")})`,
@@ -414,18 +595,12 @@ function LandingPage() {
     setIsSubmitting(true);
     setFormError("");
     try {
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...bookingDetails,
-          amount: Number(orderAmount || 0),
-          coupon: isCouponApplied ? coupon.trim().toUpperCase() : null,
-          email: user.email,
-        }),
+      const result = await createOrder({
+        ...bookingDetails,
+        amount: Number(orderAmount || 0),
+        coupon: isCouponApplied ? coupon.trim().toUpperCase() : null,
+        email: user.email,
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
       setUser(result.user);
       window.localStorage.setItem("bnb-user", JSON.stringify(result.user));
       window.localStorage.setItem(
@@ -450,6 +625,28 @@ function LandingPage() {
 
     return () => window.clearInterval(phraseTimer);
   }, []);
+
+  useEffect(() => {
+    const stepTimer = window.setInterval(() => {
+      setSelectedStep(
+        (currentStep) => (currentStep % howItWorksSteps.length) + 1,
+      );
+    }, 2500);
+
+    return () => window.clearInterval(stepTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!hasStepChanged.current) {
+      hasStepChanged.current = true;
+      return;
+    }
+
+    setStepChangeGlow(true);
+    const glowTimer = window.setTimeout(() => setStepChangeGlow(false), 900);
+
+    return () => window.clearTimeout(glowTimer);
+  }, [selectedStep]);
 
   useEffect(() => {
     const revealCards = document.querySelectorAll(".service-reveal-card");
@@ -485,7 +682,19 @@ function LandingPage() {
       className="site-shell"
       style={{ "--hero-photo": `url(${heroPhoto})` }}
     >
-      <Navbar user={user} onLogin={openLogin} onLogout={handleLogout} />
+
+      <Navbar
+        user={user}
+        onLogin={openLogin}
+        onLogout={handleLogout}
+        luckyDrawBanner={{
+          winnerName: monthlyDraw?.lastWinnerName || "",
+          winnerMonth: monthlyDraw?.lastWinnerMonth || "",
+          nextDrawDate,
+          slide: monthlyDrawSlide,
+          slideCount: monthlyDrawSlideCount,
+        }}
+      />
 
       <section className="hero-section" id="top">
         <div className="snow-drizzle" aria-hidden="true">
@@ -530,13 +739,7 @@ function LandingPage() {
             Beautiful spaces, thoughtful details, and a little more magic for
             every kind of gathering.
           </p>
-          <button
-            className="booking-button"
-            onClick={openBooking}
-            type="button"
-          >
-            Book your celebration <span>↗</span>
-          </button>
+
         </div>
       </section>
 
@@ -556,9 +759,13 @@ function LandingPage() {
         <div className="celebration-experiences-grid">
           {orderedExperiences.map((experience, index) => (
             <button
+              ref={(element) => {
+                if (element)
+                  experienceCardRefs.current[experience.title] = element;
+              }}
               className={`celebration-experience-card bliss-${experience.color} ${selectedExperience === experience.title ? "selected" : ""} ${index === Math.floor(orderedExperiences.length / 2) ? "center-card" : ""}`}
               key={experience.title}
-              onClick={() => setSelectedExperience(experience.title)}
+              onClick={() => handleExperienceSelection(experience.title)}
               type="button"
               aria-label={`Select ${experience.title}`}
               aria-pressed={selectedExperience === experience.title}
@@ -588,7 +795,7 @@ function LandingPage() {
             How It <span>Works</span>
           </h2>
           <button
-            className={`register-cta ${registrationActive ? "selected" : ""}`}
+            className={`register-cta ${registrationActive ? "selected" : ""} ${stepChangeGlow ? "step-change-glow" : ""}`}
             onClick={handleRegistrationClick}
             type="button"
             aria-pressed={registrationActive}
@@ -620,16 +827,16 @@ function LandingPage() {
         </div>
       </section>
 
-      <section className="experience-section" aria-label="Our services">
+      <section
+        className="experience-section"
+        id="services"
+        aria-label="Our services"
+      >
         <div className="experience-heading-row">
           <p className="experience-eyebrow">Our services</p>
           <h2 className="experience-title">
             Everything you need for your <span>celebration</span>
           </h2>
-          <p className="experience-note">
-            From beautiful setups to unforgettable moments, we take care of
-            every detail to make your special day truly memorable.
-          </p>
         </div>
 
         <div className="experience-grid">
@@ -658,7 +865,11 @@ function LandingPage() {
         </div>
       </section>
 
-      <section className="gallery-section" aria-labelledby="gallery-title">
+      <section
+        className="gallery-section"
+        id="gallery"
+        aria-labelledby="gallery-title"
+      >
         <div className="gallery-header">
           <h2 id="gallery-title">Gallery</h2>
         </div>
@@ -688,7 +899,7 @@ function LandingPage() {
                 className={`gallery-card ${isActive ? "active" : ""}`}
                 key={`${item.title}-${index}`}
                 style={{
-                  transform: `translate(-50%, -50%) translateX(${wrappedIndex * 150}px) scale(${isActive ? 1 : Math.max(0.76, 1 - distance * 0.08)})`,
+                  transform: `translate(-50%, -50%) translateX(${wrappedIndex * (isMobileGallery ? 95 : 150)}px) scale(${isActive ? 1 : Math.max(0.76, 1 - distance * 0.08)})`,
                   opacity: isActive ? 1 : Math.max(0.45, 1 - distance * 0.14),
                   zIndex: isActive ? 20 : 10 - distance,
                   filter: isActive
@@ -708,6 +919,44 @@ function LandingPage() {
         </div>
       </section>
 
+      <section
+        className="customer-reviews-section"
+        aria-labelledby="customer-reviews-title"
+      >
+        <div className="customer-reviews-heading">
+          <p className="experience-eyebrow">Kind words</p>
+          <h2 id="customer-reviews-title">
+            What our customers <span>say</span>
+          </h2>
+          <p className="customer-reviews-intro">
+            Sample testimonials for preview. Replace these with verified
+            customer reviews before publishing.
+          </p>
+        </div>
+        <div className="customer-reviews-grid">
+          {sampleReviews.map((review, index) => (
+            <article className="customer-review-card" key={review.text}>
+              <div className="customer-review-card-top">
+                <span className="customer-review-avatar" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <div className="customer-review-author">
+                  <strong>Sample customer</strong>
+                  <span>Preview only</span>
+                </div>
+              </div>
+              <div
+                className="customer-review-stars"
+                aria-label="5 out of 5 stars"
+              >
+                {"★★★★★"}
+              </div>
+              <p className="customer-review-text">“{review.text}”</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <Footer />
 
       {activeModal && (
@@ -717,7 +966,11 @@ function LandingPage() {
           role="presentation"
         >
           <div
-            className="modal-card"
+            className={
+              activeModal === "login"
+                ? "modal-card login-modal-card"
+                : "modal-card"
+            }
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -732,38 +985,55 @@ function LandingPage() {
             </button>
             {activeModal === "login" ? (
               <>
-                <p className="eyebrow dark">Member access</p>
+                <div className="login-modal-brand">
+                  <span aria-hidden="true">B</span>
+                  <div>
+                    <p className="eyebrow dark">Binge &amp; Bliss</p>
+                    <small>MEMBER ACCESS</small>
+                  </div>
+                </div>
                 <div className="login-role-toggle" aria-label="Login type">
                   <button
-                    className={loginRole === "customer" ? "is-active" : ""}
-                    onClick={() => {
-                      setLoginRole("customer");
-                      setFormError("");
-                    }}
-                    type="button"
-                  >
-                    Customer
-                  </button>
-                  <button
                     className={loginRole === "admin" ? "is-active" : ""}
+                    aria-pressed={loginRole === "admin"}
                     onClick={() => {
                       setLoginRole("admin");
+                      setCustomerLoginStep("phone");
+                      setCustomerOtp("");
                       setFormError("");
                     }}
                     type="button"
                   >
                     Admin
                   </button>
+                  <button
+                    className={loginRole === "customer" ? "is-active" : ""}
+                    aria-pressed={loginRole === "customer"}
+                    onClick={() => {
+                      setLoginRole("customer");
+                      setCustomerLoginStep("phone");
+                      setCustomerOtp("");
+                      setCustomerNeedsRegistration(false);
+                      setFormError("");
+                    }}
+                    type="button"
+                  >
+                    Customer
+                  </button>
                 </div>
                 <h2>
                   {loginRole === "admin"
                     ? "Admin access."
-                    : "Unlock your BNB coupon."}
+                    : customerLoginStep === "otp"
+                      ? "Verify your number."
+                      : "View your registration."}
                 </h2>
                 <p>
                   {loginRole === "admin"
                     ? "Sign in to manage the lucky draw."
-                    : "Sign in with your email and we’ll create your personal 10% code."}
+                    : customerLoginStep === "otp"
+                      ? `Enter the verification code for ${normalizeCustomerPhone(customerPhone)}.`
+                      : "Enter the WhatsApp number you used to register."}
                 </p>
                 <form className="modal-form" onSubmit={handleLogin}>
                   {loginRole === "admin" ? (
@@ -788,35 +1058,177 @@ function LandingPage() {
                         placeholder="Admin password"
                         required
                       />
+                      <button
+                        className="login-test-prefill"
+                        onClick={() => {
+                          if (import.meta.env.DEV) {
+                            setAdminEmail(testAdminCredentials.email);
+                            setAdminPassword(testAdminCredentials.password);
+                          } else {
+                            setAdminEmail("admin@bingenbliss.com");
+                          }
+                          setFormError("");
+                        }}
+                        type="button"
+                      >
+                        {import.meta.env.DEV
+                          ? "Fill development admin"
+                          : "Prefill admin email"}
+                      </button>
+                      <p className="login-test-hint">
+                        {import.meta.env.DEV
+                          ? "Works only with the local development backend."
+                          : "Enter your admin password to sign in."}
+                      </p>
                     </>
                   ) : (
                     <>
-                      <label htmlFor="login-email">Email address</label>
-                      <input
-                        id="login-email"
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        placeholder="you@example.com"
-                        required
-                      />
+                      {customerLoginStep === "phone" ? (
+                        <>
+                          <label htmlFor="login-customer-phone">
+                            WhatsApp number
+                          </label>
+                          <input
+                            id="login-customer-phone"
+                            type="tel"
+                            inputMode="numeric"
+                            autoComplete="tel"
+                            value={customerPhone}
+                            onChange={(event) => {
+                              setCustomerPhone(
+                                event.target.value
+                                  .replace(/\D/g, "")
+                                  .slice(-12),
+                              );
+                              setCustomerNeedsRegistration(false);
+                              setFormError("");
+                            }}
+                            placeholder="10-digit WhatsApp number"
+                            required
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <label htmlFor="login-customer-otp">
+                            Verification code
+                          </label>
+                          <input
+                            id="login-customer-otp"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={4}
+                            value={customerOtp}
+                            onChange={(event) =>
+                              setCustomerOtp(
+                                event.target.value.replace(/\D/g, "").slice(0, 4),
+                              )
+                            }
+                            placeholder="4-digit code"
+                            required
+                          />
+                          <button
+                            className="login-test-prefill"
+                            onClick={() => {
+                              setCustomerLoginStep("phone");
+                              setCustomerOtp("");
+                              setFormError("");
+                            }}
+                            type="button"
+                          >
+                            Change phone number
+                          </button>
+                          {import.meta.env.DEV && (
+                            <p className="login-test-hint">
+                              Development test code: 7374. No real message is
+                              sent.
+                            </p>
+                          )}
+                        </>
+                      )}
                     </>
                   )}
                   {formError && <p className="form-error">{formError}</p>}
+                  {customerNeedsRegistration && loginRole === "customer" && (
+                    <a className="login-register-link" href="/lucky-draw">
+                      Register for the lucky draw <span aria-hidden="true">↗</span>
+                    </a>
+                  )}
                   <button
                     className="dark-button"
                     disabled={isSubmitting}
                     type="submit"
                   >
                     {isSubmitting
-                      ? "Signing in..."
+                      ? "Please wait..."
                       : loginRole === "admin"
                         ? "Sign in"
-                        : "Continue"}{" "}
+                        : customerLoginStep === "phone"
+                          ? "Continue"
+                          : "Verify code"}{" "}
                     <span>↗</span>
                   </button>
                 </form>
+                <p className="login-privacy-note">
+                  <span aria-hidden="true">✦</span>
+                  Customer sign-in uses your registered WhatsApp number.
+                </p>
               </>
+            ) : activeModal === "customer-profile" ? (
+              <div className="customer-profile-content">
+                <p className="eyebrow dark">Customer account</p>
+                <h2>Your registration</h2>
+                <p>These are the details saved with your lucky draw entry.</p>
+                <dl className="customer-profile-grid">
+                  <div>
+                    <dt>Full name</dt>
+                    <dd>{customerProfile?.name || "Not provided"}</dd>
+                  </div>
+                  <div>
+                    <dt>WhatsApp number</dt>
+                    <dd>{customerProfile?.phone || "Not provided"}</dd>
+                  </div>
+                  <div>
+                    <dt>Special occasion</dt>
+                    <dd>{customerProfile?.occasion || "Not provided"}</dd>
+                  </div>
+                  <div>
+                    <dt>Celebration date</dt>
+                    <dd>
+                      {formatCustomerProfileDate(
+                        customerProfile?.celebrationDate,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Expected guests</dt>
+                    <dd>{customerProfile?.guests || "Not provided"}</dd>
+                  </div>
+                  <div>
+                    <dt>Registered on</dt>
+                    <dd>
+                      {formatCustomerRegistrationTime(
+                        customerProfile?.registeredAt,
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+                <button
+                  className="dark-button"
+                  onClick={() => {
+                    if (pendingBooking) {
+                      setActiveModal("order");
+                      setPendingBooking(false);
+                    } else {
+                      setActiveModal(null);
+                    }
+                  }}
+                  type="button"
+                >
+                  {pendingBooking ? "Continue to booking" : "Done"}{" "}
+                  <span>↗</span>
+                </button>
+              </div>
             ) : activeModal === "confirmation" ? (
               <div className="confirmation-content">
                 <p className="eyebrow dark">Booking received</p>

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   adminLogin,
-  getAdminCustomers,
   getLuckyDrawStatus,
+  setLuckyDrawIncludeAllEntriesNextDraw,
+  setLuckyDrawIncludeAllThisMonthEntriesNextDraw,
   setLuckyDrawVisibility,
   spinLuckyDraw,
   updateLuckyDrawFeatures,
@@ -19,6 +20,14 @@ function formatLast4Phone(phone) {
   return "•••• 1234";
 }
 
+function normalizeDrawEntries(entries = []) {
+  return entries.map((entry, index) => ({
+    ...entry,
+    id: String(entry.id ?? index),
+    name: entry.name || "",
+  }));
+}
+
 function AdminLuckyDraw() {
   const [entries, setEntries] = useState([]);
   const [adminToken, setAdminToken] = useState(
@@ -27,38 +36,73 @@ function AdminLuckyDraw() {
   const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [adminError, setAdminError] = useState("");
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isSpinRequestInFlight, setIsSpinRequestInFlight] = useState(false);
+  const spinRequestInFlightRef = useRef(false);
   const [showWheelOverlay, setShowWheelOverlay] = useState(false);
   const [winner, setWinner] = useState(null);
   const [showWinnerPopup, setShowWinnerPopup] = useState(false);
   const [whatsappLink, setWhatsappLink] = useState("");
   const [wheelEnabled, setWheelEnabled] = useState(false);
+  const [manualDrawCompleted, setManualDrawCompleted] = useState(false);
+  const [hasWinnerForCurrentCycle, setHasWinnerForCurrentCycle] =
+    useState(false);
+  const [customerVisibilityDecision, setCustomerVisibilityDecision] =
+    useState(null);
+  const [includeAllEntriesNextDraw, setIncludeAllEntriesNextDraw] =
+    useState(false);
+  const [
+    includeAllThisMonthEntriesNextDraw,
+    setIncludeAllThisMonthEntriesNextDraw,
+  ] = useState(false);
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
-  const [featureSettings, setFeatureSettings] = useState({
+  const [isUpdatingEligibilityReset, setIsUpdatingEligibilityReset] =
+    useState(false);
+  const [isUpdatingMonthEntries, setIsUpdatingMonthEntries] = useState(false);
+  const [eligibilityRules, setEligibilityRules] = useState({
     annualEligibilityEnabled: true,
+    previousWinnerExclusionEnabled: true,
   });
-  const [isUpdatingFeatures, setIsUpdatingFeatures] = useState(false);
+  const [isSavingEligibilityRules, setIsSavingEligibilityRules] =
+    useState(false);
+  const [isAdminStatusLoaded, setIsAdminStatusLoaded] = useState(false);
 
   useEffect(() => {
     if (!adminToken) return;
-    Promise.all([getLuckyDrawStatus(), getAdminCustomers(adminToken)])
-      .then(([status, customerResult]) => {
-        const normalizedCustomers = (customerResult.customers || []).map(
-          (customer, index) => ({
-            ...customer,
-            id: String(customer.id ?? index),
-            name: customer.name ?? customer.Name ?? "",
-            phone: customer.phone ?? customer.Phone ?? "",
-            dob:
-              customer.dob ?? customer.date ?? customer["Date of birth"] ?? "",
-            occasion:
-              customer.occasion ?? customer.Occasion ?? "Special Celebration",
-          }),
-        );
+    setIsAdminStatusLoaded(false);
+    getLuckyDrawStatus()
+      .then((status) => {
         setWheelEnabled(status.wheelEnabled);
-        setFeatureSettings({
+        if (typeof status.wheelEnabled === "boolean") {
+          setCustomerVisibilityDecision(status.wheelEnabled);
+        }
+        const drawDone = Boolean(
+          status.manualDrawCompleted || status.hasWinnerForCurrentCycle,
+        );
+        setManualDrawCompleted(drawDone);
+        setHasWinnerForCurrentCycle(Boolean(status.hasWinnerForCurrentCycle));
+        if (status.lastSpin?.winner) {
+          const w = status.lastSpin.winner;
+          setWinner((current) => current || {
+            id: String(w.id ?? status.lastSpin.id ?? createClientId()),
+            name: w.Name || w.name,
+            phone: w.Phone || w.phone,
+            date: w.date || w.dob || w["Date of birth"],
+            occasion: w.occasion || w.Occasion || "Special Celebration",
+          });
+        }
+        setIncludeAllEntriesNextDraw(
+          status.includeAllEntriesNextDraw === true,
+        );
+        setIncludeAllThisMonthEntriesNextDraw(
+          status.includeAllThisMonthEntriesNextDraw === true,
+        );
+        setEligibilityRules({
           annualEligibilityEnabled: status.annualEligibilityEnabled !== false,
+          previousWinnerExclusionEnabled:
+            status.previousWinnerExclusionEnabled !== false,
         });
-        setEntries(normalizedCustomers);
+        setEntries(normalizeDrawEntries(status.entries));
+        setIsAdminStatusLoaded(true);
       })
       .catch((error) => {
         if (error.message === "Admin access is required") {
@@ -71,6 +115,62 @@ function AdminLuckyDraw() {
       });
   }, [adminToken]);
 
+  useEffect(() => {
+    if (!adminToken || !isAdminStatusLoaded) return undefined;
+    let isActive = true;
+
+    const syncDrawStatus = async () => {
+      try {
+        const status = await getLuckyDrawStatus();
+        if (!isActive) return;
+
+        setEntries(normalizeDrawEntries(status.entries));
+        setWheelEnabled(status.wheelEnabled);
+        if (typeof status.wheelEnabled === "boolean") {
+          setCustomerVisibilityDecision(status.wheelEnabled);
+        }
+        const drawDone = Boolean(
+          status.manualDrawCompleted || status.hasWinnerForCurrentCycle,
+        );
+        setManualDrawCompleted(drawDone);
+        setHasWinnerForCurrentCycle(Boolean(status.hasWinnerForCurrentCycle));
+        setIncludeAllEntriesNextDraw(
+          status.includeAllEntriesNextDraw === true,
+        );
+        setIncludeAllThisMonthEntriesNextDraw(
+          status.includeAllThisMonthEntriesNextDraw === true,
+        );
+      } catch (error) {
+        if (isActive) {
+          handleAdminActionError(error, "Unable to refresh draw status");
+        }
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (isActive && document.visibilityState === "visible") {
+        void syncDrawStatus();
+      }
+    }, 2500);
+
+    window.addEventListener("focus", syncDrawStatus);
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", syncDrawStatus);
+    };
+  }, [adminToken, isAdminStatusLoaded]);
+
+  const handleAdminActionError = (error, fallbackMessage) => {
+    if (error.message === "Admin access is required") {
+      window.localStorage.removeItem("bnb-admin-token");
+      setAdminToken("");
+      setAdminError("Your admin session has expired. Sign in again.");
+      return;
+    }
+    setAdminError(error.message || fallbackMessage);
+  };
+
   const handleAdminLogin = async (event) => {
     event.preventDefault();
     setAdminError("");
@@ -79,26 +179,46 @@ function AdminLuckyDraw() {
       setAdminToken(result.token);
       window.localStorage.setItem("bnb-admin-token", result.token);
       setCredentials({ email: "", password: "" });
-      window.history.replaceState({}, "", "/");
+      window.history.replaceState({}, "", "/admin");
     } catch (error) {
       setAdminError(error.message || "Unable to sign in as admin");
     }
   };
 
-  const handleSpin = async () => {
-    if (!adminToken || isDrawing || showWheelOverlay) return;
+  const isCompletedOrHasWinner = Boolean(
+    manualDrawCompleted ||
+    hasWinnerForCurrentCycle ||
+    winner,
+  );
+
+  const handleSpin = async (options = {}) => {
+    const isRespin = Boolean(options?.isRespin || isCompletedOrHasWinner);
+
+    if (
+      !adminToken ||
+      spinRequestInFlightRef.current ||
+      (!isRespin && customerVisibilityDecision === null) ||
+      isUpdatingVisibility ||
+      isDrawing ||
+      showWheelOverlay ||
+      !entries.length
+    ) {
+      return;
+    }
+
+    // Immediately prevent multiple clicks and update UI to drawing mode
+    spinRequestInFlightRef.current = true;
+    setIsSpinRequestInFlight(true);
+    setIsDrawing(true);
+    setShowWinnerPopup(false);
     setAdminError("");
+    let animationWillContinue = false;
+
     try {
-      const result = await spinLuckyDraw(adminToken);
-      const matchingEntry = entries.find((entry) => {
-        const entryName = entry.name ?? entry.Name ?? "";
-        const entryPhone = entry.phone ?? entry.Phone ?? "";
-        return (
-          entryName === result.winner.Name && entryPhone === result.winner.Phone
-        );
-      });
-      const winnerEntry = matchingEntry || {
-        id: createClientId(),
+      const result = await spinLuckyDraw(adminToken, { respin: isRespin });
+      setManualDrawCompleted(true);
+      const winnerEntry = {
+        id: String(result.winner.id ?? result.spinId ?? createClientId()),
         name: result.winner.Name || result.winner.name,
         phone: result.winner.Phone || result.winner.phone,
         date:
@@ -111,10 +231,28 @@ function AdminLuckyDraw() {
           "Special Celebration",
       };
       setWinner(winnerEntry);
+      try {
+        window.localStorage.setItem("bnb-lucky-draw-latest-winner", JSON.stringify(winnerEntry));
+      } catch {}
       setWhatsappLink(result.whatsapp?.chatLink || "");
 
-      // Step 1: Rapid capsule blinking on main screen
-      setIsDrawing(true);
+      try {
+        const updatedStatus = await getLuckyDrawStatus();
+        setEntries(normalizeDrawEntries(updatedStatus.entries));
+      } catch {}
+
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setIsDrawing(false);
+        setShowWheelOverlay(false);
+        setShowWinnerPopup(true);
+        spinRequestInFlightRef.current = false;
+        setWheelEnabled(false);
+        setCustomerVisibilityDecision(false);
+        return;
+      }
+
+      // Keep the entry animation visible before the wheel begins.
+      animationWillContinue = true;
       if (window.matchMedia("(max-width: 768px)").matches) {
         window.setTimeout(() => {
           document
@@ -125,60 +263,368 @@ function AdminLuckyDraw() {
       setShowWheelOverlay(false);
       setShowWinnerPopup(false);
 
-      // Step 2: Show spinning wheel overlay after 2.2s
+      // Start the wheel after the entry capsules have animated.
       window.setTimeout(() => {
         setShowWheelOverlay(true);
-      }, 2200);
+      }, 3500);
 
-      // Step 3: Hide overlay & open winner dialog after another 2.5s (4.7s total)
+      // Match the wheel animation duration before showing the winner dialog.
       window.setTimeout(() => {
         setIsDrawing(false);
         setShowWheelOverlay(false);
         setShowWinnerPopup(true);
-      }, 4700);
+        spinRequestInFlightRef.current = false;
+        setWheelEnabled(false);
+        setCustomerVisibilityDecision(false);
+      }, 9000);
     } catch (error) {
-      if (error.message === "Admin access is required") {
-        window.localStorage.removeItem("bnb-admin-token");
-        setAdminToken("");
+      setIsDrawing(false);
+      spinRequestInFlightRef.current = false;
+      handleAdminActionError(error, "Unable to run the lucky draw");
+    } finally {
+      setIsSpinRequestInFlight(false);
+      if (!animationWillContinue) {
+        spinRequestInFlightRef.current = false;
       }
-      setAdminError(error.message || "Unable to spin the wheel");
     }
   };
 
-  const handleVisibilityToggle = async () => {
+  const handleCustomerVisibilityDecision = async (enabled) => {
+    if (isUpdatingVisibility || isDrawing || isSpinRequestInFlight) {
+      return;
+    }
     setIsUpdatingVisibility(true);
     setAdminError("");
     try {
-      const result = await setLuckyDrawVisibility(adminToken, !wheelEnabled);
+      const result = await setLuckyDrawVisibility(adminToken, enabled);
       setWheelEnabled(result.wheelEnabled);
+      setCustomerVisibilityDecision(result.wheelEnabled);
     } catch (error) {
-      setAdminError(error.message || "Unable to update draw visibility");
+      handleAdminActionError(error, "Unable to update draw visibility");
     } finally {
       setIsUpdatingVisibility(false);
     }
   };
 
-  const handleFeatureSettingChange = async (feature, enabled) => {
-    const previousValue = featureSettings[feature];
-    setFeatureSettings((current) => ({ ...current, [feature]: enabled }));
-    setIsUpdatingFeatures(true);
+  const handleEligibilityReset = async () => {
+    if (isUpdatingEligibilityReset || isDrawing || isSpinRequestInFlight) return;
+    setIsUpdatingEligibilityReset(true);
+    setAdminError("");
+    try {
+      const result = await setLuckyDrawIncludeAllEntriesNextDraw(
+        adminToken,
+        !includeAllEntriesNextDraw,
+      );
+      setIncludeAllEntriesNextDraw(result.includeAllEntriesNextDraw);
+      if (result.includeAllEntriesNextDraw) {
+        setIncludeAllThisMonthEntriesNextDraw(false);
+      }
+      try {
+        const status = await getLuckyDrawStatus();
+        setEntries(normalizeDrawEntries(status.entries));
+      } catch (error) {
+        setAdminError(
+          `Eligibility reset saved, but entries could not be refreshed: ${error.message}`,
+        );
+      }
+    } catch (error) {
+      handleAdminActionError(error, "Unable to update next-draw eligibility");
+    } finally {
+      setIsUpdatingEligibilityReset(false);
+    }
+  };
+
+  const handleIncludeThisMonthEntries = async () => {
+    if (isUpdatingMonthEntries || isDrawing || isSpinRequestInFlight) return;
+    setIsUpdatingMonthEntries(true);
+    setAdminError("");
+    try {
+      const result = await setLuckyDrawIncludeAllThisMonthEntriesNextDraw(
+        adminToken,
+        !includeAllThisMonthEntriesNextDraw,
+      );
+      setIncludeAllThisMonthEntriesNextDraw(
+        result.includeAllThisMonthEntriesNextDraw,
+      );
+      if (result.includeAllThisMonthEntriesNextDraw) {
+        setIncludeAllEntriesNextDraw(false);
+      }
+      try {
+        const status = await getLuckyDrawStatus();
+        setEntries(normalizeDrawEntries(status.entries));
+      } catch (error) {
+        setAdminError(
+          `Monthly entries option saved, but entries could not be refreshed: ${error.message}`,
+        );
+      }
+    } catch (error) {
+      handleAdminActionError(error, "Unable to update this month's entries");
+    } finally {
+      setIsUpdatingMonthEntries(false);
+    }
+  };
+
+  const handleEligibilityRuleChange = (field, value) => {
+    setEligibilityRules((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleSaveEligibilityRules = async () => {
+    setIsSavingEligibilityRules(true);
     setAdminError("");
 
     try {
       const settings = await updateLuckyDrawFeatures(adminToken, {
-        [feature]: enabled,
+        annualEligibilityEnabled: eligibilityRules.annualEligibilityEnabled,
+        previousWinnerExclusionEnabled:
+          eligibilityRules.previousWinnerExclusionEnabled,
       });
-      setFeatureSettings(settings);
+      setEligibilityRules({
+        annualEligibilityEnabled: settings.annualEligibilityEnabled !== false,
+        previousWinnerExclusionEnabled:
+          settings.previousWinnerExclusionEnabled !== false,
+      });
+      try {
+        const status = await getLuckyDrawStatus();
+        setEntries(normalizeDrawEntries(status.entries));
+      } catch (error) {
+        setAdminError(
+          `Rules saved, but eligible entries could not be refreshed: ${error.message}`,
+        );
+      }
     } catch (error) {
-      setFeatureSettings((current) => ({
-        ...current,
-        [feature]: previousValue,
-      }));
-      setAdminError(error.message || "Unable to update lucky draw settings");
+      handleAdminActionError(error, "Unable to save eligibility rules");
     } finally {
-      setIsUpdatingFeatures(false);
+      setIsSavingEligibilityRules(false);
     }
   };
+
+  const renderSharedDrawOptions = () => (
+    <section className="admin-draw-common-options" aria-label="Shared draw options">
+      <div className="admin-draw-step">
+        <div className="admin-draw-step-heading">
+          <span>Step 1</span>
+          <h2>Eligibility rules <small>(Optional)</small></h2>
+        </div>
+        <fieldset
+          className="admin-feature-settings admin-eligibility-rules"
+          disabled={isSavingEligibilityRules || isDrawing || isSpinRequestInFlight}
+        >
+          <legend>Who can enter this draw?</legend>
+          <label className="admin-feature-toggle">
+            <span>
+              <strong>Annual entry eligibility</strong>
+              <small>
+                Limit each phone number to one eligible entry every 12 months.
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              checked={eligibilityRules.annualEligibilityEnabled}
+              onChange={(event) =>
+                handleEligibilityRuleChange(
+                  "annualEligibilityEnabled",
+                  event.target.checked,
+                )
+              }
+            />
+          </label>
+          <label className="admin-feature-toggle">
+            <span>
+              <strong>Previous winner exclusion</strong>
+              <small>Exclude customers who won within the last 12 months.</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={eligibilityRules.previousWinnerExclusionEnabled}
+              onChange={(event) =>
+                handleEligibilityRuleChange(
+                  "previousWinnerExclusionEnabled",
+                  event.target.checked,
+                )
+              }
+            />
+          </label>
+          <button
+            className="admin-save-draw-setup"
+            disabled={isSavingEligibilityRules || isDrawing || isSpinRequestInFlight}
+            onClick={handleSaveEligibilityRules}
+            type="button"
+          >
+            {isSavingEligibilityRules ? "Saving eligibility..." : "Save eligibility rules"}
+          </button>
+        </fieldset>
+      </div>
+
+      <div className="admin-draw-step">
+        <div className="admin-draw-step-heading">
+          <span>Step 2</span>
+          <h2>Entry overrides <small>(Optional)</small></h2>
+        </div>
+        <div className="admin-eligibility-reset">
+          <div>
+            <strong>
+              {includeAllEntriesNextDraw
+                ? "Next draw includes all registered customers"
+                : "Recent winners are excluded"}
+            </strong>
+            <small>
+              {includeAllEntriesNextDraw
+                ? "The one-time reset clears automatically after the next draw."
+                : "Include recent winners in the next draw only."}
+            </small>
+          </div>
+          <button
+            className="admin-eligibility-reset-button"
+            disabled={
+              isUpdatingEligibilityReset || isDrawing || isSpinRequestInFlight
+            }
+            onClick={handleEligibilityReset}
+            type="button"
+          >
+            {isUpdatingEligibilityReset
+              ? "Updating..."
+              : includeAllEntriesNextDraw
+                ? "Cancel next-draw reset"
+                : "Include everyone in next draw"}
+          </button>
+        </div>
+        <div className="admin-eligibility-reset">
+          <div>
+            <strong>
+              {includeAllThisMonthEntriesNextDraw
+                ? "This draw uses celebrations happening this month"
+                : "Include only this month's celebrations"}
+            </strong>
+            <small>
+              {includeAllThisMonthEntriesNextDraw
+                ? "One entry per customer with a celebration date this month, including recent winners."
+                : "Include customers with a celebration date this month, even if they are recent winners."}
+            </small>
+          </div>
+          <button
+            className="admin-eligibility-reset-button"
+            disabled={isUpdatingMonthEntries || isDrawing || isSpinRequestInFlight}
+            onClick={handleIncludeThisMonthEntries}
+            type="button"
+          >
+            {isUpdatingMonthEntries
+              ? "Updating..."
+              : includeAllThisMonthEntriesNextDraw
+                ? "Cancel this-month celebrations"
+                : "Include this month's celebrations"}
+          </button>
+        </div>
+      </div>
+
+      <div className="admin-draw-step">
+        <div className="admin-draw-step-heading">
+          <span>Step 3</span>
+          <h2>Customer visibility <small>(Mandatory)</small></h2>
+        </div>
+        <fieldset
+          className="admin-feature-settings admin-customer-visibility"
+          disabled={isUpdatingVisibility || isDrawing || isSpinRequestInFlight}
+        >
+          <legend>Enable the draw for customers?</legend>
+          <p>
+            Choose whether the lucky draw is visible on the customer site.
+          </p>
+          <label className="admin-feature-toggle">
+            <span>
+              <strong>Yes</strong>
+              <small>Make the draw visible to customers.</small>
+            </span>
+            <input
+              type="radio"
+              name="customer-draw-visibility"
+              value="yes"
+              checked={customerVisibilityDecision === true}
+              onChange={() => handleCustomerVisibilityDecision(true)}
+            />
+          </label>
+          <label className="admin-feature-toggle">
+            <span>
+              <strong>No</strong>
+              <small>Keep the draw hidden from customers.</small>
+            </span>
+            <input
+              type="radio"
+              name="customer-draw-visibility"
+              value="no"
+              checked={customerVisibilityDecision === false}
+              onChange={() => handleCustomerVisibilityDecision(false)}
+            />
+          </label>
+          <p className="admin-visibility-status" role="status">
+            <span
+              className={`status-dot ${wheelEnabled ? "is-live" : "is-hidden"}`}
+            ></span>
+            <span>
+              Current status:{" "}
+              <strong>
+                {wheelEnabled ? "Live for customers" : "Hidden from customers"}
+              </strong>
+            </span>
+          </p>
+        </fieldset>
+      </div>
+    </section>
+  );
+
+  if (!adminToken) {
+    return (
+      <main className="admin-login-page">
+        <form className="admin-login-card" onSubmit={handleAdminLogin}>
+          <a className="admin-login-brand" href="/" aria-label="Binge & Bliss home">
+            <img src="/landing_page/logo.jpg" alt="Binge & Bliss" />
+            <span>Binge &amp; Bliss</span>
+            <small>ADMIN PORTAL</small>
+          </a>
+          <p className="admin-access-title">Admin access</p>
+          <h1>Sign in to continue</h1>
+          <p className="admin-login-description">
+            Enter your admin credentials to access the draw dashboard.
+          </p>
+          <input
+            type="email"
+            value={credentials.email}
+            onChange={(event) =>
+              setCredentials((current) => ({
+                ...current,
+                email: event.target.value,
+              }))
+            }
+            placeholder="Admin email"
+            aria-label="Admin email"
+            autoComplete="username"
+            required
+          />
+          <input
+            type="password"
+            value={credentials.password}
+            onChange={(event) =>
+              setCredentials((current) => ({
+                ...current,
+                password: event.target.value,
+              }))
+            }
+            placeholder="Admin password"
+            aria-label="Admin password"
+            autoComplete="current-password"
+            required
+          />
+          <button className="dark-button" type="submit">
+            Sign in to continue <span>↗</span>
+          </button>
+          {adminError && (
+            <p className="form-error" role="alert">
+              {adminError}
+            </p>
+          )}
+        </form>
+      </main>
+    );
+  }
 
   return (
     <main className="admin-shell">
@@ -189,8 +635,9 @@ function AdminLuckyDraw() {
         </a>
         <nav className="admin-nav">
           <a className="is-active" href="#spin-wheel">
-            Spin draw
+            Spin wheel
           </a>
+          <a href="/admin/occasions">Special occasions</a>
           <a href="/admin/customers">Customers</a>
           <a href="/admin/winner-history">Winner history</a>
           <a href="/lucky-draw">Customer site</a>
@@ -200,7 +647,7 @@ function AdminLuckyDraw() {
             className="admin-signout"
             onClick={() => {
               window.localStorage.removeItem("bnb-admin-token");
-              window.location.href = "/";
+              window.location.href = "/admin";
             }}
             type="button"
           >
@@ -218,170 +665,164 @@ function AdminLuckyDraw() {
           </span>
         </div>
         <div className="admin-draw-layout" id="spin-wheel">
-          {!adminToken ? (
-            <form className="admin-access-form" onSubmit={handleAdminLogin}>
-              <p className="admin-access-title">Admin access</p>
-              <input
-                type="email"
-                value={credentials.email}
-                onChange={(event) =>
-                  setCredentials((current) => ({
-                    ...current,
-                    email: event.target.value,
-                  }))
-                }
-                placeholder="Admin email"
-                aria-label="Admin email"
-                required
-              />
-              <input
-                type="password"
-                value={credentials.password}
-                onChange={(event) =>
-                  setCredentials((current) => ({
-                    ...current,
-                    password: event.target.value,
-                  }))
-                }
-                placeholder="Admin password"
-                aria-label="Admin password"
-                required
-              />
-              <button className="dark-button" type="submit">
-                Sign in to continue <span>↗</span>
-              </button>
-              {adminError && (
-                <p className="form-error" role="alert">
-                  {adminError}
-                </p>
-              )}
-            </form>
-          ) : (
-            <div className="admin-draw-panel">
-              <span className="admin-access-title">
-                🔒 Admin Control Active
-              </span>
-              <div className="lucky-draw-reveal-panel">
-                <span className="draw-reveal-kicker">
-                  Monthly Winner Selection
-                </span>
-                <strong className={isDrawing ? "is-drawing" : ""}>
-                  {isDrawing
-                    ? "And the winner is..."
-                    : winner
-                      ? winner.name
-                      : "Ready when you are"}
-                </strong>
-                <div
-                  className="name-capsule-grid"
-                  aria-label="Lucky draw customers"
-                >
-                  {entries.map((entry, index) => {
-                    const displayName = entry.name ?? entry.Name ?? "Unknown";
-                    const isWinner =
-                      !isDrawing &&
-                      (winner?.name ?? winner?.Name ?? "") === displayName;
-                    return (
-                      <span
-                        className={[
-                          "name-capsule",
-                          isWinner ? "is-winner" : "",
-                          isDrawing ? "is-blinking" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        key={entry.id}
-                        style={{
-                          animationDelay: `${(index * 79) % 900}ms`,
-                          animationDuration: `${1.2 + (index % 4) * 0.38}s`,
-                        }}
-                      >
-                        {displayName}
-                      </span>
-                    );
-                  })}
+          <div className="admin-draw-panel">
+            <span className="admin-access-title">
+              Admin draw control
+            </span>
+            <section className="admin-draw-tab-panel is-manual" id="draw-tab-panel">
+              {renderSharedDrawOptions()}
+              <div className="admin-draw-step">
+                <div className="admin-draw-step-heading">
+                  <span>Step 4</span>
+                  <h2>Manual spin</h2>
                 </div>
-                <small>
-                  {entries.length} entries registered in this month&apos;s draw
-                </small>
-              </div>
-
-              <button
-                className="draw-button"
-                disabled={isDrawing || !entries.length}
-                onClick={handleSpin}
-                type="button"
-              >
-                <span>
-                  {isDrawing ? "Selecting Winner..." : "Start the Draw"}
-                </span>
-                <span className="btn-arrow">→</span>
-              </button>
-
-              <button
-                className="admin-visibility-button"
-                disabled={isUpdatingVisibility}
-                onClick={handleVisibilityToggle}
-                type="button"
-              >
-                <span>
-                  {isUpdatingVisibility
-                    ? "Updating..."
-                    : wheelEnabled
-                      ? "👁 Hide Draw from Customers"
-                      : "✨ Enable Draw for Customers"}
-                </span>
-              </button>
-
-              <p className="admin-visibility-status">
-                <span
-                  className={`status-dot ${wheelEnabled ? "is-live" : "is-hidden"}`}
-                ></span>
-                <span>
-                  Public Wheel:{" "}
-                  <strong>
-                    {wheelEnabled
-                      ? "Live for customers"
-                      : "Hidden from customers"}
-                  </strong>
-                </span>
-              </p>
-
-              <fieldset
-                className="admin-feature-settings"
-                disabled={isUpdatingFeatures}
-              >
-                <legend>Draw behavior</legend>
-                <label className="admin-feature-toggle">
-                  <span>
-                    <strong>Annual entry limit</strong>
+                <section
+                  className="admin-draw-widget is-unlocked"
+                  aria-label="Lucky draw widget"
+                  aria-disabled={customerVisibilityDecision === null}
+                >
+                  <div className="lucky-draw-reveal-panel">
+                    <span className="draw-reveal-kicker">
+                      Manual Winner Selection
+                    </span>
+                    <strong className={isDrawing ? "is-drawing" : ""}>
+                      {isDrawing
+                        ? "Selecting Winner..."
+                        : winner
+                          ? winner.name
+                          : "Ready when you are"}
+                    </strong>
+                    <div
+                      className="name-capsule-grid"
+                      aria-label="Lucky draw customers"
+                    >
+                      {entries.map((entry, index) => {
+                        const displayName =
+                          entry.name ?? entry.Name ?? "Unknown";
+                        const isWinner =
+                          !isDrawing &&
+                          (winner?.name ?? winner?.Name ?? "") === displayName;
+                        return (
+                          <span
+                            className={[
+                              "name-capsule",
+                              isWinner ? "is-winner" : "",
+                              isDrawing ? "is-blinking" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            key={entry.id}
+                            style={{
+                              animationDelay: `${(index * 79) % 900}ms`,
+                            }}
+                          >
+                            {displayName}
+                          </span>
+                        );
+                      })}
+                    </div>
                     <small>
-                      Limit each phone to one entry per year and exclude recent
-                      winners.
+                      {entries.length} eligible entries in this month&apos;s draw
                     </small>
-                  </span>
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={featureSettings.annualEligibilityEnabled}
-                    onChange={(event) =>
-                      handleFeatureSettingChange(
-                        "annualEligibilityEnabled",
-                        event.target.checked,
-                      )
+                  </div>
+                  <button
+                    id="admin-start-spin-button"
+                    className={`draw-button ${isDrawing || isSpinRequestInFlight ? "is-running" : ""}`}
+                    disabled={
+                      isCompletedOrHasWinner ||
+                      isSpinRequestInFlight ||
+                      customerVisibilityDecision === null ||
+                      isUpdatingVisibility ||
+                      isDrawing ||
+                      !entries.length
                     }
-                    aria-label="Enable annual entry and winner limits"
-                  />
-                </label>
-              </fieldset>
-
-              {adminError && (
-                <p className="form-error" role="alert">
-                  {adminError}
-                </p>
-              )}
-            </div>
-          )}
+                    style={{
+                      pointerEvents:
+                        isCompletedOrHasWinner ||
+                        isSpinRequestInFlight ||
+                        customerVisibilityDecision === null ||
+                        isUpdatingVisibility ||
+                        isDrawing ||
+                        !entries.length
+                          ? "none"
+                          : "auto",
+                      opacity:
+                        isCompletedOrHasWinner ||
+                        isSpinRequestInFlight ||
+                        customerVisibilityDecision === null ||
+                        isUpdatingVisibility ||
+                        isDrawing ||
+                        !entries.length
+                          ? 0.7
+                          : 1,
+                      cursor:
+                        isCompletedOrHasWinner ||
+                        isSpinRequestInFlight ||
+                        customerVisibilityDecision === null ||
+                        isUpdatingVisibility ||
+                        isDrawing ||
+                        !entries.length
+                          ? "not-allowed"
+                          : "pointer",
+                    }}
+                    onClick={handleSpin}
+                    type="button"
+                  >
+                    <span>
+                      {isDrawing
+                        ? "Selecting Winner..."
+                        : isCompletedOrHasWinner
+                          ? "Draw Complete"
+                          : isSpinRequestInFlight
+                            ? "Starting Draw..."
+                            : customerVisibilityDecision === null
+                              ? "Choose Yes or No to continue"
+                              : "Start / Run the Draw"}
+                    </span>
+                    <span className="btn-arrow">→</span>
+                  </button>
+                  {isCompletedOrHasWinner && (
+                    <div className="admin-respin-container">
+                      <button
+                        id="admin-respin-button"
+                        className="admin-respin-button"
+                        onClick={() => handleSpin({ isRespin: true })}
+                        disabled={
+                          isDrawing ||
+                          isSpinRequestInFlight ||
+                          !entries.length
+                        }
+                        type="button"
+                      >
+                        <span className="respin-icon">🔄</span>
+                        <span>
+                          {isDrawing
+                            ? "Selecting New Winner..."
+                            : isSpinRequestInFlight
+                              ? "Starting Re-spin..."
+                              : "Re-spin (Choose Another Winner)"}
+                        </span>
+                        <span className="btn-arrow">→</span>
+                      </button>
+                      <p className="admin-respin-hint">
+                        💡 <strong>Re-spin option:</strong> Use if the winner is unavailable, for festival special draws, or testing. Selects another winner from remaining eligible entries.
+                      </p>
+                    </div>
+                  )}
+                  <p className="admin-redraw-note">
+                    One winner is selected per customer-visibility session.
+                    To start a new draw, turn customer visibility off and
+                    enable it again.
+                  </p>
+                </section>
+              </div>
+            </section>
+            {adminError && (
+              <p className="form-error" role="alert">
+                {adminError}
+              </p>
+            )}
+          </div>
         </div>
       </section>
       {/* Full Screen Spinning Wheel Overlay Blocking Screen */}
@@ -541,7 +982,31 @@ function AdminLuckyDraw() {
 
               <div className="template-overlay-layer">
                 {/* Occasion Ribbon Text - Winner Name */}
-                <div className="overlay-ribbon-text">{winner.name}</div>
+                <svg
+                  className="overlay-ribbon-text"
+                  viewBox="0 0 100 32"
+                  role="img"
+                  aria-label={`Winner: ${winner.name}`}
+                >
+                  <defs>
+                    <path
+                      id="admin-winner-name-curve"
+                      d="M 8 27 Q 50 5 92 27"
+                    />
+                  </defs>
+                  <text>
+                    <textPath
+                      href="#admin-winner-name-curve"
+                      xlinkHref="#admin-winner-name-curve"
+                      startOffset="50%"
+                      textAnchor="middle"
+                      textLength="82"
+                      lengthAdjust="spacingAndGlyphs"
+                    >
+                      {winner.name}
+                    </textPath>
+                  </text>
+                </svg>
 
                 {/* Slot 2: Celebration Date */}
                 <div className="overlay-slot slot-date">
@@ -582,15 +1047,26 @@ function AdminLuckyDraw() {
                 >
                   Send WhatsApp Notification <span>↗</span>
                 </a>
-              ) : (
-                <button
-                  className="winner-claim-btn"
-                  onClick={() => setShowWinnerPopup(false)}
-                  type="button"
-                >
-                  Close Poster <span>✨</span>
-                </button>
-              )}
+              ) : null}
+              <button
+                id="admin-modal-respin-btn"
+                className="winner-respin-secondary-btn"
+                onClick={() => {
+                  setShowWinnerPopup(false);
+                  handleSpin({ isRespin: true });
+                }}
+                type="button"
+                disabled={isDrawing || isSpinRequestInFlight || !entries.length}
+              >
+                🔄 Re-spin (New Winner)
+              </button>
+              <button
+                className="winner-claim-btn"
+                onClick={() => setShowWinnerPopup(false)}
+                type="button"
+              >
+                Close Poster <span>✨</span>
+              </button>
             </div>
           </div>
         </div>

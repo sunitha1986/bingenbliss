@@ -7,27 +7,50 @@ import {
   updateLuckyDrawCustomer as updateCustomerRecord,
 } from "../config/luckyDrawDatabase.js";
 import { notifyLuckyDrawWinner } from "../services/whatsapp.js";
+import { normalizePhone } from "../utils/normalizePhone.js";
 import {
   findOrCreateUser,
   findOrCreateUserByPhone,
   findUserByEmail,
+  clearLuckyDrawNextDrawEligibilityOptions,
   getLuckyDrawFeatureSettings,
   getLuckyDrawLastSpin,
+  getLuckyDrawSpinningState,
   getLuckyDrawWinnerHistory,
   getLuckyDrawWheelEnabled,
   markCouponUsed,
   publicUser,
   recordLuckyDrawSpin,
   saveOrder,
+  setLuckyDrawCelebrationOccasions,
+  setLuckyDrawIncludeAllEntriesNextDraw as saveIncludeAllEntriesNextDraw,
+  setLuckyDrawIncludeAllThisMonthEntriesNextDraw as saveIncludeAllThisMonthEntriesNextDraw,
   setLuckyDrawFeatureSettings,
+  setLuckyDrawManualDrawCompleted,
+  setLuckyDrawSpinningState,
   setLuckyDrawWheelEnabled,
+  withLuckyDrawCycleLock,
 } from "../models/luckyDrawModel.js";
+import { getEligibleLuckyDrawCustomers } from "../services/luckyDrawEligibility.js";
+import {
+  getIndiaDrawCycle,
+  getIndiaDrawDate,
+} from "../utils/indiaDate.js";
+
+function isValidDrawDate(date) {
+  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return false;
+  }
+  const [year, month, day] = date.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
 
 const oneYearInMs = 365 * 24 * 60 * 60 * 1000;
-
-function normalizePhone(phone) {
-  return String(phone || "").replace(/\D/g, "");
-}
 
 function isWithinOneYear(date, now = Date.now()) {
   const timestamp = Date.parse(date);
@@ -35,27 +58,6 @@ function isWithinOneYear(date, now = Date.now()) {
     Number.isFinite(timestamp) &&
     timestamp >= now - oneYearInMs &&
     timestamp <= now
-  );
-}
-
-function getEligibleLuckyDrawCustomers(
-  customers,
-  winnerHistory,
-  annualEligibilityEnabled,
-) {
-  if (!annualEligibilityEnabled) return customers;
-
-  const recentWinners = new Set(
-    winnerHistory
-      .filter((spin) => isWithinOneYear(spin.spunAt))
-      .map((spin) => normalizePhone(spin.winner?.Phone || spin.winner?.phone))
-      .filter(Boolean),
-  );
-
-  return customers.filter(
-    (customer) =>
-      isWithinOneYear(customer["Submitted at"] || customer.submittedAt) &&
-      !recentWinners.has(normalizePhone(customer.Phone || customer.phone)),
   );
 }
 
@@ -75,23 +77,120 @@ function validPhone(phone) {
   return true;
 }
 
+function toCustomerProfile(customer) {
+  return {
+    name: customer.Name || customer.name || "",
+    phone: normalizePhone(customer.Phone || customer.phone),
+    occasion: customer.Occasion || customer.occasion || "",
+    celebrationDate:
+      customer["Celebration date"] ||
+      customer["Date of birth"] ||
+      customer.date ||
+      "",
+    guests: Number(customer.Guests || customer.guests) || 0,
+    registeredAt: customer["Submitted at"] || customer.submittedAt || "",
+  };
+}
+
+async function findRegisteredCustomerByPhone(phone) {
+  const customers = await readLuckyDrawCustomers();
+  return (
+    customers
+      .filter(
+        (entry) => normalizePhone(entry.Phone || entry.phone) === phone,
+      )
+      .sort((left, right) => {
+        const leftTime = Date.parse(
+          left["Submitted at"] || left.submittedAt || "",
+        );
+        const rightTime = Date.parse(
+          right["Submitted at"] || right.submittedAt || "",
+        );
+        return (
+          (Number.isFinite(rightTime) ? rightTime : 0) -
+          (Number.isFinite(leftTime) ? leftTime : 0)
+        );
+      })[0] || null
+  );
+}
+
+function validateCustomerLoginPhone(phone) {
+  if (!validPhone(phone)) {
+    return {
+      error: "Enter a valid 10-digit Indian WhatsApp number.",
+      status: 400,
+    };
+  }
+  return null;
+}
+
+export async function lookupCustomerRegistration(request, response, next) {
+  try {
+    const phone = normalizePhone(request.body?.phone);
+    const validationError = validateCustomerLoginPhone(phone);
+    if (validationError) {
+      return response
+        .status(validationError.status)
+        .json({ message: validationError.error });
+    }
+
+    const customer = await findRegisteredCustomerByPhone(phone);
+    return response.json({ registered: Boolean(customer) });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function verifyCustomerLogin(request, response, next) {
+  try {
+    if (process.env.NODE_ENV !== "development") {
+      return response.status(503).json({
+        message:
+          "Phone OTP sign-in is not enabled in production yet. Please contact us for help.",
+      });
+    }
+
+    const phone = normalizePhone(request.body?.phone);
+    const validationError = validateCustomerLoginPhone(phone);
+    if (validationError) {
+      return response
+        .status(validationError.status)
+        .json({ message: validationError.error });
+    }
+
+    if (String(request.body?.code || "").trim() !== "7374") {
+      return response.status(401).json({ message: "Invalid verification code" });
+    }
+
+    const customer = await findRegisteredCustomerByPhone(phone);
+    if (!customer) {
+      return response.status(404).json({
+        message: "No registration was found for this number. Please register.",
+      });
+    }
+
+    const user = await findOrCreateUserByPhone(phone);
+    if (!user) {
+      return response.status(404).json({
+        message: "No customer account was found for this phone number",
+      });
+    }
+    return response.json({
+      user: publicUser(user),
+      profile: toCustomerProfile(customer),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function login(request, response, next) {
   try {
-    const phone = request.body?.phone?.replace(/\D/g, "");
+    const phone = normalizePhone(request.body?.phone);
     if (phone) {
-      if (!validPhone(phone)) {
-        return response
-          .status(400)
-          .json({ message: "Enter a valid 10-digit phone number" });
-      }
-
-      const user = await findOrCreateUserByPhone(phone);
-      if (!user) {
-        return response.status(404).json({
-          message: "No customer account was found for this phone number",
-        });
-      }
-      return response.json({ user: publicUser(user) });
+      return response.status(400).json({
+        message: "Use the customer OTP verification flow to sign in by phone.",
+      });
     }
 
     const email = request.body?.email?.trim().toLowerCase();
@@ -213,13 +312,27 @@ export async function createLuckyDrawEntry(request, response, next) {
       !name?.trim() ||
       !validPhone(normalizedPhone) ||
       !celebrationDate ||
-      !occasion?.trim() ||
+      !isValidDrawDate(celebrationDate) ||
+      celebrationDate <= getIndiaDrawDate() ||
+      typeof occasion !== "string" ||
+      !occasion.trim() ||
       !guests ||
       Number(guests) < 1
     ) {
       return response.status(400).json({
         message:
-          "Please complete all registration details with a valid 10-digit WhatsApp number.",
+          celebrationDate &&
+            isValidDrawDate(celebrationDate) &&
+            celebrationDate <= getIndiaDrawDate()
+            ? "Celebration date must be in the future."
+            : "Please complete all registration details with a valid 10-digit WhatsApp number.",
+      });
+    }
+
+    const featureSettings = await getLuckyDrawFeatureSettings();
+    if (!featureSettings.celebrationOccasions.includes(occasion.trim())) {
+      return response.status(400).json({
+        message: "Select an available celebration occasion.",
       });
     }
 
@@ -230,13 +343,12 @@ export async function createLuckyDrawEntry(request, response, next) {
       });
     }
 
-    const { annualEligibilityEnabled } = await getLuckyDrawFeatureSettings();
-    if (annualEligibilityEnabled) {
+    if (featureSettings.annualEligibilityEnabled) {
       const existingCustomers = await readLuckyDrawCustomers();
       const hasRecentEntry = existingCustomers.some(
         (customer) =>
           normalizePhone(customer.Phone || customer.phone) ===
-            normalizedPhone &&
+          normalizedPhone &&
           isWithinOneYear(customer["Submitted at"] || customer.submittedAt),
       );
       if (hasRecentEntry) {
@@ -266,6 +378,7 @@ export async function createLuckyDrawEntry(request, response, next) {
 
     return response.status(201).json({
       customer,
+      profile: toCustomerProfile(customer),
       user: user
         ? publicUser(user)
         : { name: name.trim(), phone: normalizedPhone },
@@ -277,27 +390,85 @@ export async function createLuckyDrawEntry(request, response, next) {
 
 export async function luckyDrawStatus(request, response, next) {
   try {
-    const isDrawDay = new Date().getDate() === 1;
     const wheelEnabled = await getLuckyDrawWheelEnabled();
     const featureSettings = await getLuckyDrawFeatureSettings();
+    const { isDrawing, drawingWinner } = await getLuckyDrawSpinningState();
     const lastSpin = await getLuckyDrawLastSpin();
     const customers = await readLuckyDrawCustomers();
     const winnerHistory = await getLuckyDrawWinnerHistory();
     const eligibleCustomers = getEligibleLuckyDrawCustomers(
       customers,
       winnerHistory,
-      featureSettings.annualEligibilityEnabled,
+      featureSettings.previousWinnerExclusionEnabled,
+      {
+        includeAllEntries: featureSettings.includeAllEntriesNextDraw,
+        includeAllThisMonthEntries:
+          featureSettings.includeAllThisMonthEntriesNextDraw,
+        entriesMonth: featureSettings.includeAllThisMonthEntriesMonth,
+      },
     );
+    const currentCycle = getIndiaDrawCycle();
+    const hasWinnerForCurrentCycle = winnerHistory.some((spin) => {
+      const spunAt = new Date(spin?.spunAt || "");
+      return (
+        Number.isFinite(spunAt.getTime()) &&
+        getIndiaDrawCycle(spunAt) === currentCycle
+      );
+    });
+    const manualDrawCompleted =
+      featureSettings.manualDrawCompleted === true || hasWinnerForCurrentCycle;
     return response.json({
-      isDrawDay,
       wheelEnabled,
       showWheel: wheelEnabled,
+      isDrawing,
+      drawingWinner,
       ...featureSettings,
+      manualDrawCompleted,
+      hasWinnerForCurrentCycle,
       lastSpin,
       entries: eligibleCustomers.map((customer, index) => ({
         id: String(index),
         name: customer.Name,
       })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function luckyDrawLatestWinner(request, response, next) {
+  try {
+    const [wheelEnabled, winnerHistory] = await Promise.all([
+      getLuckyDrawWheelEnabled(),
+      getLuckyDrawWinnerHistory(),
+    ]);
+    const latestWinner = winnerHistory
+      .filter(
+        (spin) =>
+          spin?.winner && Number.isFinite(Date.parse(spin.spunAt || "")),
+      )
+      .sort(
+        (first, second) =>
+          Date.parse(second.spunAt) - Date.parse(first.spunAt),
+      )[0];
+    const latestWinnerDate = latestWinner
+      ? new Date(latestWinner.spunAt)
+      : null;
+
+    return response.json({
+      wheelEnabled,
+      winner: latestWinner?.winner || null,
+      lastWinnerName:
+        latestWinner?.winner?.Name ||
+        latestWinner?.winner?.name ||
+        "",
+      lastWinnerMonth: latestWinnerDate
+        ? new Intl.DateTimeFormat("en-IN", {
+          month: "long",
+          year: "numeric",
+          timeZone: "Asia/Kolkata",
+        }).format(latestWinnerDate)
+        : "",
     });
   } catch (error) {
     return next(error);
@@ -318,6 +489,12 @@ export async function listLuckyDrawWinners(request, response, next) {
         name: spin.winner.Name || spin.winner.name || "Lucky Winner",
         occasion:
           spin.winner.Occasion || spin.winner.occasion || "Special Celebration",
+        eventDate:
+          spin.winner["Celebration date"] ||
+          spin.winner["Date of birth"] ||
+          spin.winner.date ||
+          spin.winner.dob ||
+          null,
         announcedAt: spin.spunAt || null,
       }))
       .sort(
@@ -347,27 +524,96 @@ export async function spinLuckyDraw(request, response, next) {
       return response.status(401).json({ message: "Admin access is required" });
     }
 
-    const customers = await readLuckyDrawCustomers();
-    const winnerHistory = await getLuckyDrawWinnerHistory();
-    const { annualEligibilityEnabled } = await getLuckyDrawFeatureSettings();
-    const eligibleCustomers = getEligibleLuckyDrawCustomers(
-      customers,
-      winnerHistory,
-      annualEligibilityEnabled,
-    );
+    const isRespin = Boolean(request.body?.respin || request.body?.isRespin);
+    const lockKey = getIndiaDrawCycle();
+    const draw = await withLuckyDrawCycleLock(lockKey, async () => {
+      const featureSettings = await getLuckyDrawFeatureSettings();
 
-    if (!eligibleCustomers.length) {
+      if (featureSettings.manualDrawCompleted === true && !isRespin) {
+        return {
+          error: "This month's lucky draw already has a winner. Use Re-spin to select another winner.",
+          status: 409,
+        };
+      }
+
+      const customers = await readLuckyDrawCustomers();
+      const winnerHistory = await getLuckyDrawWinnerHistory();
+      const hasWinnerForCurrentCycle = winnerHistory.some((spin) => {
+        const spunAt = new Date(spin?.spunAt || "");
+        return (
+          Number.isFinite(spunAt.getTime()) &&
+          getIndiaDrawCycle(spunAt) === lockKey
+        );
+      });
+      if (hasWinnerForCurrentCycle && !isRespin) {
+        return {
+          error: "This month's lucky draw already has a winner. Use Re-spin to select another winner.",
+          status: 409,
+        };
+      }
+
+      let eligibleCustomers = getEligibleLuckyDrawCustomers(
+        customers,
+        winnerHistory,
+        featureSettings.previousWinnerExclusionEnabled,
+        {
+          includeAllEntries: featureSettings.includeAllEntriesNextDraw,
+          includeAllThisMonthEntries:
+            featureSettings.includeAllThisMonthEntriesNextDraw,
+          entriesMonth: featureSettings.includeAllThisMonthEntriesMonth,
+        },
+      );
+      if (!eligibleCustomers.length && isRespin) {
+        eligibleCustomers = getEligibleLuckyDrawCustomers(
+          customers,
+          [],
+          false,
+        );
+      }
+      if (!eligibleCustomers.length) {
+        return {
+          error: "No eligible lucky draw entries are available",
+          status: 400,
+        };
+      }
+
+      const winner =
+        eligibleCustomers[Math.floor(Math.random() * eligibleCustomers.length)];
+      const lastSpin = await recordLuckyDrawSpin(winner, { isRespin });
+      await setLuckyDrawManualDrawCompleted();
+      await setLuckyDrawSpinningState(true, winner);
+      if (
+        featureSettings.includeAllEntriesNextDraw ||
+        featureSettings.includeAllThisMonthEntriesNextDraw
+      ) {
+        await clearLuckyDrawNextDrawEligibilityOptions();
+      }
+      return {
+        winner,
+        spinId: lastSpin.id,
+        isRespin,
+        includeAllEntriesNextDraw: false,
+        includeAllThisMonthEntriesNextDraw: false,
+      };
+    });
+
+    if (!draw.acquired) {
+      return response.status(409).json({
+        message: "A lucky draw is already in progress. Please try again.",
+      });
+    }
+    if (draw.value.error) {
       return response
-        .status(400)
-        .json({ message: "No eligible lucky draw entries are available" });
+        .status(draw.value.status)
+        .json({ message: draw.value.error });
     }
 
-    const winner =
-      eligibleCustomers[Math.floor(Math.random() * eligibleCustomers.length)];
-    const lastSpin = await recordLuckyDrawSpin(winner);
-    const whatsapp = await notifyLuckyDrawWinner(winner);
-    return response.json({ winner, spinId: lastSpin.id, whatsapp });
+    const whatsapp = await notifyLuckyDrawWinner(draw.value.winner);
+    return response.json({ ...draw.value, whatsapp });
   } catch (error) {
+    if (error.code === "DUPLICATE_LUCKY_DRAW_CYCLE") {
+      return response.status(409).json({ message: error.message });
+    }
     return next(error);
   }
 }
@@ -385,23 +631,138 @@ export async function setLuckyDrawVisibility(request, response, next) {
   }
 }
 
+export async function setLuckyDrawIncludeAllEntriesNextDraw(
+  request,
+  response,
+  next,
+) {
+  try {
+    if (!isAdminToken(request.get("authorization")?.replace("Bearer ", ""))) {
+      return response.status(401).json({ message: "Admin access is required" });
+    }
+    if (typeof request.body?.enabled !== "boolean") {
+      return response.status(400).json({
+        message: "Choose whether to include all entries in the next draw.",
+      });
+    }
+
+    const lockKey = getIndiaDrawCycle();
+    const update = await withLuckyDrawCycleLock(lockKey, async () => {
+      return {
+        includeAllEntriesNextDraw:
+          await saveIncludeAllEntriesNextDraw(request.body.enabled),
+      };
+    });
+
+    if (!update.acquired) {
+      return response.status(409).json({
+        message: "A lucky draw is in progress. Try changing eligibility again.",
+      });
+    }
+    return response.json(update.value);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function setLuckyDrawIncludeAllThisMonthEntriesNextDraw(
+  request,
+  response,
+  next,
+) {
+  try {
+    if (!isAdminToken(request.get("authorization")?.replace("Bearer ", ""))) {
+      return response.status(401).json({ message: "Admin access is required" });
+    }
+    if (typeof request.body?.enabled !== "boolean") {
+      return response.status(400).json({
+        message: "Choose whether to include all entries submitted this month.",
+      });
+    }
+
+    const lockKey = getIndiaDrawCycle();
+    const update = await withLuckyDrawCycleLock(lockKey, async () => {
+      return saveIncludeAllThisMonthEntriesNextDraw(
+        request.body.enabled,
+      );
+    });
+
+    if (!update.acquired) {
+      return response.status(409).json({
+        message: "A lucky draw is in progress. Try changing eligibility again.",
+      });
+    }
+    return response.json(update.value);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function updateLuckyDrawFeatures(request, response, next) {
   try {
     if (!isAdminToken(request.get("authorization")?.replace("Bearer ", ""))) {
       return response.status(401).json({ message: "Admin access is required" });
     }
 
-    const { annualEligibilityEnabled } = request.body || {};
-    if (typeof annualEligibilityEnabled !== "boolean") {
+    const {
+      annualEligibilityEnabled,
+      previousWinnerExclusionEnabled,
+    } = request.body || {};
+    if (
+      typeof annualEligibilityEnabled !== "boolean" ||
+      typeof previousWinnerExclusionEnabled !== "boolean"
+    ) {
       return response.status(400).json({
-        message: "Annual eligibility setting must be provided.",
+        message: "Set both eligibility options.",
       });
     }
 
     const settings = await setLuckyDrawFeatureSettings({
       annualEligibilityEnabled,
+      previousWinnerExclusionEnabled,
     });
     return response.json(settings);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function updateLuckyDrawOccasions(request, response, next) {
+  try {
+    if (!isAdminToken(request.get("authorization")?.replace("Bearer ", ""))) {
+      return response.status(401).json({ message: "Admin access is required" });
+    }
+
+    const occasions = request.body?.celebrationOccasions;
+    if (
+      !Array.isArray(occasions) ||
+      occasions.length < 1 ||
+      occasions.length > 20 ||
+      occasions.some(
+        (occasion) =>
+          typeof occasion !== "string" ||
+          !occasion.trim() ||
+          occasion.trim().length > 40,
+      )
+    ) {
+      return response.status(400).json({
+        message: "Add between 1 and 20 occasion names, up to 40 characters each.",
+      });
+    }
+
+    const normalizedOccasions = occasions.map((occasion) => occasion.trim());
+    const normalizedNames = normalizedOccasions.map((occasion) =>
+      occasion.toLocaleLowerCase(),
+    );
+    if (new Set(normalizedNames).size !== normalizedNames.length) {
+      return response.status(400).json({
+        message: "Occasion names must be unique.",
+      });
+    }
+
+    const celebrationOccasions =
+      await setLuckyDrawCelebrationOccasions(normalizedOccasions);
+    return response.json({ celebrationOccasions });
   } catch (error) {
     return next(error);
   }
@@ -415,10 +776,40 @@ function requireAdmin(request, response) {
   return true;
 }
 
+function compareCustomersNewestFirst(first, second) {
+  const firstSubmittedAt = Date.parse(
+    first["Submitted at"] || first.submittedAt || "",
+  );
+  const secondSubmittedAt = Date.parse(
+    second["Submitted at"] || second.submittedAt || "",
+  );
+  const firstTimestamp = Number.isFinite(firstSubmittedAt)
+    ? firstSubmittedAt
+    : Number.NEGATIVE_INFINITY;
+  const secondTimestamp = Number.isFinite(secondSubmittedAt)
+    ? secondSubmittedAt
+    : Number.NEGATIVE_INFINITY;
+
+  if (firstTimestamp !== secondTimestamp) {
+    return secondTimestamp - firstTimestamp;
+  }
+
+  const firstId = Number(first.id);
+  const secondId = Number(second.id);
+  if (Number.isFinite(firstId) && Number.isFinite(secondId)) {
+    return secondId - firstId;
+  }
+  return String(second.id || "").localeCompare(String(first.id || ""), "en", {
+    numeric: true,
+  });
+}
+
 export async function listLuckyDrawCustomers(request, response, next) {
   try {
     if (!requireAdmin(request, response)) return;
-    const customers = await readLuckyDrawCustomers();
+    const customers = (await readLuckyDrawCustomers()).sort(
+      compareCustomersNewestFirst,
+    );
     return response.json({ customers });
   } catch (error) {
     return next(error);
@@ -429,12 +820,28 @@ export async function updateLuckyDrawCustomer(request, response, next) {
   try {
     if (!requireAdmin(request, response)) return;
     const customerId = request.params.customerId;
-    const { name, phone, dob } = request.body || {};
+    const {
+      name,
+      phone,
+      occasion,
+      celebrationDate,
+      dob,
+      guests,
+      consent,
+      submittedAt,
+    } = request.body || {};
     if (
       !/^[1-9][0-9]*$/.test(customerId) ||
       !name?.trim() ||
       !/^[0-9]{10}$/.test(phone || "") ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(dob || "")
+      typeof occasion !== "string" ||
+      !occasion.trim() ||
+      !isValidDrawDate(celebrationDate) ||
+      !isValidDrawDate(dob) ||
+      !Number.isInteger(Number(guests)) ||
+      Number(guests) < 1 ||
+      !["Yes", "No"].includes(consent) ||
+      !Number.isFinite(new Date(submittedAt).getTime())
     ) {
       return response
         .status(400)
@@ -444,7 +851,12 @@ export async function updateLuckyDrawCustomer(request, response, next) {
     const customer = await updateCustomerRecord(customerId, {
       name: name.trim(),
       phone,
+      occasion: occasion.trim(),
+      celebrationDate,
       dob,
+      guests: Number(guests),
+      consent,
+      submittedAt,
     });
     if (!customer) {
       return response.status(404).json({ message: "Customer not found" });

@@ -4,9 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch server.js",
+    "dev": "node --watch --import ./src/config/developmentEnv.js server.js",
     "start": "node server.js",
     "db:migrate-excel": "node src/scripts/migrateLuckyDrawExcel.js",
+    "db:migrate-lucky-draw-history": "node src/scripts/migrateLuckyDrawHistory.js",
     "lint": "oxlint server.js src"
   },
   "dependencies": {

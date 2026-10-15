@@ -35,6 +35,28 @@ function toMysqlDateTime(value) {
   return date.toISOString().slice(0, 23).replace("T", " ");
 }
 
+function getIndiaDrawMonth(value) {
+  const indiaDate = new Date(new Date(value).getTime() + 330 * 60 * 1000);
+  return `${indiaDate.getUTCFullYear()}-${String(
+    indiaDate.getUTCMonth() + 1,
+  ).padStart(2, "0")}`;
+}
+
+function toSpin(spin) {
+  if (!spin || typeof spin.id !== "string" || !spin.winner) {
+    throw new TypeError("Lucky draw spin record is invalid");
+  }
+  const spunAt = new Date(spin.spunAt);
+  if (!Number.isFinite(spunAt.getTime())) {
+    throw new TypeError("Lucky draw spin timestamp is invalid");
+  }
+  return {
+    id: spin.id,
+    winner: spin.winner,
+    spunAt: spunAt.toISOString(),
+  };
+}
+
 function toCustomer(row) {
   return {
     id: String(row.id),
@@ -74,12 +96,31 @@ async function insertCustomer(connection, customer) {
   return { ...customer, id: String(result.insertId) };
 }
 
+function fromSpin(row) {
+  const winner =
+    typeof row.winner === "string" ? JSON.parse(row.winner) : row.winner;
+  return {
+    id: row.spin_id,
+    winner,
+    spunAt: row.spun_at,
+  };
+}
+
 async function findCustomerById(id) {
   const [rows] = await pool.execute(
     "SELECT * FROM lucky_draw_customers WHERE id = ?",
     [id],
   );
   return rows[0] ? toCustomer(rows[0]) : null;
+}
+
+async function retryAfterLostConnection(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error.code !== "PROTOCOL_CONNECTION_LOST") throw error;
+    return operation();
+  }
 }
 
 export async function initializeLuckyDrawDatabase() {
@@ -105,6 +146,41 @@ export async function initializeLuckyDrawDatabase() {
         INDEX idx_lucky_draw_phone_submitted_at (phone, submitted_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
       )
+      .then(() =>
+        pool.execute(
+          `CREATE TABLE IF NOT EXISTS lucky_draw_spins (
+          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          spin_id CHAR(36) NOT NULL UNIQUE,
+          winner LONGTEXT NOT NULL,
+          spun_at DATETIME(3) NOT NULL,
+          draw_month CHAR(7) NOT NULL,
+          INDEX idx_lucky_draw_spins_draw_month (draw_month),
+          INDEX idx_lucky_draw_spins_spun_at (spun_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+        ).then(() =>
+          pool.execute(
+            "ALTER TABLE lucky_draw_spins DROP INDEX uq_lucky_draw_spins_draw_month",
+          ).catch(() => {}),
+        ),
+      )
+      .then(() =>
+        pool.execute(
+        `CREATE TABLE IF NOT EXISTS lucky_draw_spin_cycles (
+        draw_month CHAR(7) NOT NULL PRIMARY KEY,
+        spin_id CHAR(36) NOT NULL,
+        recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+        ),
+      )
+      .then(() =>
+        pool.query(
+        `INSERT IGNORE INTO lucky_draw_spin_cycles (draw_month, spin_id)
+         SELECT DATE_FORMAT(DATE_ADD(spun_at, INTERVAL 330 MINUTE), '%Y-%m'),
+           MIN(spin_id)
+         FROM lucky_draw_spins
+         GROUP BY DATE_FORMAT(DATE_ADD(spun_at, INTERVAL 330 MINUTE), '%Y-%m')`,
+        ),
+      )
       .catch((error) => {
         initialization = undefined;
         throw error;
@@ -122,6 +198,133 @@ export async function readLuckyDrawCustomers() {
   return rows.map(toCustomer);
 }
 
+export async function readLuckyDrawSpins() {
+  await initializeLuckyDrawDatabase();
+  const [rows] = await pool.query(
+    `SELECT spin_id, winner,
+      DATE_FORMAT(spun_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS spun_at
+     FROM lucky_draw_spins
+     ORDER BY spun_at, id`,
+  );
+  return rows.map(fromSpin);
+}
+
+export async function readLatestLuckyDrawSpin() {
+  await initializeLuckyDrawDatabase();
+  const [rows] = await pool.query(
+    `SELECT spin_id, winner,
+      DATE_FORMAT(spun_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS spun_at
+     FROM lucky_draw_spins
+     ORDER BY spun_at DESC, id DESC
+     LIMIT 1`,
+  );
+  return rows[0] ? fromSpin(rows[0]) : null;
+}
+
+export async function appendLuckyDrawSpin(spin, { isRespin = false } = {}) {
+  await initializeLuckyDrawDatabase();
+  const record = toSpin(spin);
+  const drawMonth = getIndiaDrawMonth(record.spunAt);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    if (isRespin) {
+      await connection.execute(
+        `INSERT INTO lucky_draw_spin_cycles (draw_month, spin_id)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE spin_id = VALUES(spin_id), recorded_at = CURRENT_TIMESTAMP`,
+        [drawMonth, record.id],
+      );
+    } else {
+      await connection.execute(
+        `INSERT INTO lucky_draw_spin_cycles (draw_month, spin_id)
+         VALUES (?, ?)`,
+        [drawMonth, record.id],
+      );
+    }
+    await connection.execute(
+      `INSERT INTO lucky_draw_spins (spin_id, winner, spun_at, draw_month)
+       VALUES (?, ?, ?, ?)`,
+      [
+        record.id,
+        JSON.stringify(record.winner),
+        toMysqlDateTime(record.spunAt),
+        drawMonth,
+      ],
+    );
+    await connection.commit();
+    return record;
+  } catch (error) {
+    await connection.rollback();
+    if (error.code === "ER_DUP_ENTRY") {
+      const duplicateError = new Error(
+        "This month's lucky draw already has a winner. Use Re-spin to select another winner.",
+      );
+      duplicateError.code = "DUPLICATE_LUCKY_DRAW_CYCLE";
+      throw duplicateError;
+    }
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+export async function withLuckyDrawCycleLock(cycle, action) {
+  await initializeLuckyDrawDatabase();
+  const connection = await pool.getConnection();
+  const lockName = `bnb-lucky-draw-${cycle}`;
+  let lockAcquired = false;
+  try {
+    const [rows] = await connection.execute(
+      "SELECT GET_LOCK(?, 0) AS acquired",
+      [lockName],
+    );
+    lockAcquired = Number(rows[0]?.acquired) === 1;
+    if (!lockAcquired) return { acquired: false };
+
+    return { acquired: true, value: await action() };
+  } finally {
+    try {
+      if (lockAcquired) {
+        await connection.execute("SELECT RELEASE_LOCK(?)", [lockName]);
+      }
+    } finally {
+      connection.release();
+    }
+  }
+}
+
+export async function importLuckyDrawSpins(spins) {
+  await initializeLuckyDrawDatabase();
+  const connection = await pool.getConnection();
+  let imported = 0;
+  try {
+    await connection.beginTransaction();
+    for (const spin of spins.map(toSpin)) {
+      const drawMonth = getIndiaDrawMonth(spin.spunAt);
+      const [result] = await connection.execute(
+        `INSERT INTO lucky_draw_spins (spin_id, winner, spun_at, draw_month)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE spin_id = spin_id`,
+        [
+          spin.id,
+          JSON.stringify(spin.winner),
+          toMysqlDateTime(spin.spunAt),
+          drawMonth,
+        ],
+      );
+      if (result.affectedRows === 1) imported += 1;
+    }
+    await connection.commit();
+    return imported;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 export async function appendLuckyDrawCustomer(customer) {
   await initializeLuckyDrawDatabase();
   const connection = await pool.getConnection();
@@ -132,15 +335,40 @@ export async function appendLuckyDrawCustomer(customer) {
   }
 }
 
-export async function updateLuckyDrawCustomer(id, { name, phone, dob }) {
+export async function updateLuckyDrawCustomer(
+  id,
+  {
+    name,
+    phone,
+    occasion,
+    celebrationDate,
+    dob,
+    guests,
+    consent,
+    submittedAt,
+  },
+) {
   await initializeLuckyDrawDatabase();
-  await pool.execute(
-    `UPDATE lucky_draw_customers
-     SET name = ?, phone = ?, date_of_birth = ?
-     WHERE id = ?`,
-    [name, phone, toMysqlDate(dob), id],
+  await retryAfterLostConnection(() =>
+    pool.execute(
+      `UPDATE lucky_draw_customers
+       SET name = ?, phone = ?, occasion = ?, celebration_date = ?,
+           date_of_birth = ?, guests = ?, consent = ?, submitted_at = ?
+       WHERE id = ?`,
+      [
+        name,
+        phone,
+        occasion,
+        toMysqlDate(celebrationDate),
+        toMysqlDate(dob),
+        guests,
+        consent,
+        toMysqlDateTime(submittedAt),
+        id,
+      ],
+    ),
   );
-  return findCustomerById(id);
+  return retryAfterLostConnection(() => findCustomerById(id));
 }
 
 export async function deleteLuckyDrawCustomer(id) {

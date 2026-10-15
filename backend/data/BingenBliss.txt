@@ -84,10 +84,11 @@ https://mysql.site4now.net/index.php?route=/table/import&db=db_a26f8d_troy&table
 
 Database 
 
+host - mysql5036.site4now.net
 db name -  db_ac5b80_binge
 uname - ac5b80_binge
 pass - Binge@2026
-host - mysql5036.site4now.net
+
 
 
 FTP

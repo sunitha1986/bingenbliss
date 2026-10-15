@@ -1,23 +1,71 @@
 import { useEffect, useRef, useState } from "react";
-import Navbar from "../components/Navbar";
+import { useScrollLoadedCount } from "../hooks/useScrollLoadedCount";
 import Footer from "../components/Footer";
+import { testAdminCredentials } from "../testCredentials";
 import {
   adminLogin,
   createLuckyDrawEntry,
+  getLuckyDrawLatestWinner,
   getLuckyDrawStatus,
+  lookupCustomerRegistration,
+  verifyCustomerLogin,
 } from "../services/api";
 import "../App.css";
 import "./LuckyDraw.css";
 
-const celebrationOccasions = [
-  "Birthday party",
-  "Anniversary",
-  "Kitty party",
-  "Private theatre",
-  "Mini theatre",
-  "Photography",
-  "Other",
-];
+const WINNER_CACHE_KEY = "bnb-lucky-draw-latest-winner";
+const DRAW_DATE_CACHE_KEY = "bnb-lucky-draw-draw-date";
+
+function getCachedWinner() {
+  try {
+    const cached = window.localStorage.getItem(WINNER_CACHE_KEY);
+    return cached ? JSON.parse(cached) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getCachedDrawDate() {
+  try {
+    return window.localStorage.getItem(DRAW_DATE_CACHE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveWinnerToCache(winnerEntry, date) {
+  try {
+    if (winnerEntry) {
+      window.localStorage.setItem(WINNER_CACHE_KEY, JSON.stringify(winnerEntry));
+    }
+    if (date) {
+      window.localStorage.setItem(DRAW_DATE_CACHE_KEY, String(date));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function formatLuckyDrawWinner(rawWinner) {
+  if (!rawWinner) return null;
+  const name = rawWinner.Name || rawWinner.name;
+  if (!name) return null;
+  return {
+    id: `${name}-${rawWinner.Phone || rawWinner.phone || ""}`,
+    name,
+    phone: rawWinner.Phone || rawWinner.phone || "",
+    date:
+      rawWinner.date ||
+      rawWinner.dob ||
+      rawWinner["Date of birth"] ||
+      rawWinner["Celebration date"] ||
+      "",
+    occasion:
+      rawWinner.occasion ||
+      rawWinner.Occasion ||
+      "Special Celebration",
+  };
+}
 
 function formatLast4Phone(phone) {
   const clean = (phone || "").replace(/\D/g, "");
@@ -25,6 +73,75 @@ function formatLast4Phone(phone) {
     return `•••• ${clean.slice(-4)}`;
   }
   return "•••• 1234";
+}
+
+function getMinimumCelebrationDate() {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(new Date())
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value }) => [type, Number(value)]),
+  );
+  const tomorrow = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + 1));
+  return `${tomorrow.getUTCFullYear()}-${String(tomorrow.getUTCMonth() + 1).padStart(2, "0")}-${String(tomorrow.getUTCDate()).padStart(2, "0")}`;
+}
+
+function isFutureCelebrationDate(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const [year, month, day] = date.split("-").map(Number);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsedDate.getUTCFullYear() === year &&
+    parsedDate.getUTCMonth() === month - 1 &&
+    parsedDate.getUTCDate() === day &&
+    date >= getMinimumCelebrationDate()
+  );
+}
+
+function formatCustomerDate(date) {
+  if (!date) return "Not provided";
+  const [year, month, day] = date.split("-").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day, 12));
+  return Number.isFinite(value.getTime())
+    ? value.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    })
+    : "Not provided";
+}
+
+function formatDrawMonth(drawDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(drawDate || "")) return "";
+  const [year, month, day] = drawDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString(
+    "en-IN",
+    { month: "long", year: "numeric", timeZone: "UTC" },
+  );
+}
+
+function formatRegistrationDateTime(dateTime) {
+  const value = new Date(dateTime);
+  return Number.isFinite(value.getTime())
+    ? value.toLocaleString("en-IN", {
+      dateStyle: "long",
+      timeStyle: "short",
+      timeZone: "Asia/Kolkata",
+    })
+    : "Not available";
+}
+
+function normalizeCustomerPhone(phone) {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1);
+  return digits;
 }
 
 function validatePhoneNumber(phone) {
@@ -54,32 +171,53 @@ function LuckyDraw() {
 
   const [activeModal, setActiveModal] = useState(null);
   const [loginPhone, setLoginPhone] = useState("");
+  const [customerLoginStep, setCustomerLoginStep] = useState("phone");
+  const [customerLoginOtp, setCustomerLoginOtp] = useState("");
+  const [customerNeedsRegistration, setCustomerNeedsRegistration] =
+    useState(false);
   const [loginRole, setLoginRole] = useState("customer");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [luckyDrawEntries, setLuckyDrawEntries] = useState([]);
+  const [drawDate, setDrawDate] = useState(() => getCachedDrawDate());
+  const [celebrationOccasions, setCelebrationOccasions] = useState([]);
   const [luckyDrawForm, setLuckyDrawForm] = useState({
     name: "",
     phone: "",
-    occasion: "Birthday party",
+    occasion: "",
     date: "",
     guests: "2",
     consent: true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showDuplicatePhonePopup, setShowDuplicatePhonePopup] = useState(false);
   const [showWheel, setShowWheel] = useState(false);
+  const [drawStatusError, setDrawStatusError] = useState("");
   const [isDrawing, setIsDrawing] = useState(false);
   const [showWheelOverlay, setShowWheelOverlay] = useState(false);
-  const [luckyDrawWinner, setLuckyDrawWinner] = useState(null);
+  const [luckyDrawWinner, setLuckyDrawWinner] = useState(() => getCachedWinner());
   const [showWinnerPopup, setShowWinnerPopup] = useState(false);
   const lastSpinIdRef = useRef(null);
+  const completedWinnerSpinIdRef = useRef(null);
+  const isAnimatingSpinRef = useRef(false);
   const hasLoadedStatus = useRef(false);
+  const statusRequestInFlightRef = useRef(false);
+  const entryListRef = useRef(null);
+  const {
+    visibleCount: visibleEntryCount,
+    sentinelRef: entryListSentinelRef,
+    hasMore: hasMoreEntries,
+  } = useScrollLoadedCount(luckyDrawEntries.length, {
+    pageSize: 24,
+    rootRef: entryListRef,
+  });
 
   // Verification state
   const [isPhoneVerified, setIsPhoneVerified] = useState(false);
@@ -99,117 +237,213 @@ function LuckyDraw() {
     }, 380);
   };
 
-  const isLoggedIn = Boolean(user);
+  const isNamesBlinking = isDrawing;
+  const drawMonthLabel = formatDrawMonth(drawDate);
 
   useEffect(() => {
     let isMounted = true;
+
+    // Fast-path: Instantly fetch the latest winner from dedicated endpoint
+    getLuckyDrawLatestWinner()
+      .then((latest) => {
+        if (!isMounted) return;
+        const winnerObj = latest?.winner;
+        const winnerName = latest?.lastWinnerName;
+        if (winnerObj) {
+          const formatted = formatLuckyDrawWinner(winnerObj);
+          if (formatted) {
+            setLuckyDrawWinner(formatted);
+            saveWinnerToCache(formatted);
+          }
+        } else if (winnerName) {
+          setLuckyDrawWinner((current) => {
+            if (current?.name === winnerName) return current;
+            const fallback = {
+              id: winnerName,
+              name: winnerName,
+              phone: "",
+              date: "",
+              occasion: "Special Celebration",
+            };
+            saveWinnerToCache(fallback);
+            return fallback;
+          });
+        }
+      })
+      .catch(() => {});
+
     const syncStatus = async () => {
+      if (statusRequestInFlightRef.current) return;
+      statusRequestInFlightRef.current = true;
+
       try {
         const status = await getLuckyDrawStatus();
         if (!isMounted) return;
 
-        setShowWheel(status.showWheel);
+        setDrawStatusError("");
+        if (status.drawDate) {
+          setDrawDate(status.drawDate);
+        }
+        const configuredOccasions = Array.isArray(status.celebrationOccasions)
+          ? status.celebrationOccasions
+          : [];
+        setCelebrationOccasions((current) =>
+          current.length === configuredOccasions.length &&
+            current.every((occasion, index) => occasion === configuredOccasions[index])
+            ? current
+            : configuredOccasions,
+        );
+        setLuckyDrawForm((current) => {
+          if (configuredOccasions.includes(current.occasion)) return current;
+          return {
+            ...current,
+            occasion: configuredOccasions[0] || "",
+          };
+        });
+        const currentSpinId = status.lastSpin?.id || null;
+        if (!isAnimatingSpinRef.current) {
+          setShowWheel(Boolean(status.wheelEnabled || status.showWheel));
+        }
         setLuckyDrawEntries((currentEntries) => {
+          const nextEntries = status.entries;
           const hasSameEntries =
-            currentEntries.length === status.entries.length &&
+            currentEntries.length === nextEntries.length &&
             currentEntries.every(
               (entry, index) =>
-                entry.id === status.entries[index]?.id &&
-                entry.name === status.entries[index]?.name,
+                entry.id === nextEntries[index]?.id &&
+                entry.name === nextEntries[index]?.name,
             );
-          return hasSameEntries ? currentEntries : status.entries;
+          return hasSameEntries ? currentEntries : nextEntries;
         });
-
-        const currentSpinId = status.lastSpin?.id || null;
 
         if (!hasLoadedStatus.current) {
           hasLoadedStatus.current = true;
           lastSpinIdRef.current = currentSpinId;
           if (status.lastSpin) {
-            const winner = status.lastSpin.winner || {};
-            setLuckyDrawWinner({
-              id: `${winner.Name || winner.name}-${winner.Phone || winner.phone}`,
-              name: winner.Name || winner.name || "Lucky Winner",
-              phone: winner.Phone || winner.phone || "",
-              date: winner.date || winner.dob || winner["Date of birth"] || "",
-              occasion:
-                winner.occasion || winner.Occasion || "Special Celebration",
-            });
+            completedWinnerSpinIdRef.current = currentSpinId;
+            const winnerEntry = formatLuckyDrawWinner(status.lastSpin.winner);
+            if (winnerEntry) {
+              setLuckyDrawWinner(winnerEntry);
+              saveWinnerToCache(winnerEntry, status.drawDate);
+            }
+          }
+          if (status.isDrawing && !isAnimatingSpinRef.current) {
+            isAnimatingSpinRef.current = true;
+            setIsDrawing(true);
+            setShowWheel(true);
+            setShowWheelOverlay(true);
+            window.setTimeout(() => {
+              if (isMounted) {
+                setIsDrawing(false);
+                setShowWheelOverlay(false);
+                setShowWheel(false);
+                setShowWinnerPopup(true);
+                isAnimatingSpinRef.current = false;
+              }
+            }, 7000);
           }
           return;
         }
 
-        // Only trigger drawing sequence if showWheel is true AND a brand new spin occurs
-        if (
-          status.showWheel &&
-          currentSpinId &&
-          currentSpinId !== lastSpinIdRef.current
-        ) {
-          lastSpinIdRef.current = currentSpinId;
-          const winner = status.lastSpin.winner || {};
-          const winnerEntry = {
-            id: `${winner.Name || winner.name}-${winner.Phone || winner.phone}`,
-            name: winner.Name || winner.name || "Lucky Winner",
-            phone: winner.Phone || winner.phone || "",
-            date: winner.date || winner.dob || winner["Date of birth"] || "",
-            occasion:
-              winner.occasion || winner.Occasion || "Special Celebration",
-          };
-          setLuckyDrawWinner(winnerEntry);
+        // Live draw animation triggered when admin spins or a new spin is detected
+        const isSpinActive = Boolean(
+          status.isDrawing ||
+          (currentSpinId && currentSpinId !== lastSpinIdRef.current)
+        );
 
-          // Step 1: Rapid blinking on name capsules on main screen
-          setIsDrawing(true);
-          if (window.matchMedia("(max-width: 768px)").matches) {
-            window.setTimeout(() => {
-              document
-                .querySelector(".lucky-draw-reveal-panel .name-capsule-grid")
-                ?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }, 0);
+        if (isSpinActive && !isAnimatingSpinRef.current) {
+          isAnimatingSpinRef.current = true;
+          lastSpinIdRef.current = currentSpinId;
+          const winnerObj = status.drawingWinner || status.lastSpin?.winner;
+          const winnerEntry = formatLuckyDrawWinner(winnerObj);
+          if (winnerEntry) {
+            completedWinnerSpinIdRef.current = currentSpinId;
+            setLuckyDrawWinner(winnerEntry);
+            saveWinnerToCache(winnerEntry, status.drawDate);
           }
+
+          setIsDrawing(true);
+          setShowWheel(true);
           setShowWheelOverlay(false);
           setShowWinnerPopup(false);
 
-          // Step 2: Show spinning wheel overlay after 2.2s of name blinking
+          // Phase 1: Name capsules blinking (2.5s)
           window.setTimeout(() => {
             if (isMounted) {
               setShowWheelOverlay(true);
             }
-          }, 2200);
+          }, 2500);
 
-          // Step 3: Hide overlay & open winner dialog after another 2.5s (4.7s total)
+          // Phase 2: Wheel spinning completes, reveal winner popup and switch back to registration (9s)
           window.setTimeout(() => {
             if (isMounted) {
               setIsDrawing(false);
               setShowWheelOverlay(false);
+              setShowWheel(false);
               setShowWinnerPopup(true);
+              isAnimatingSpinRef.current = false;
             }
-          }, 4700);
-        } else if (currentSpinId !== lastSpinIdRef.current) {
-          lastSpinIdRef.current = currentSpinId;
+          }, 9000);
         }
-      } catch {
-        if (isMounted) setShowWheel(false);
+      } catch (error) {
+        if (isMounted) {
+          setDrawStatusError(error.message || "Unable to load lucky draw status.");
+        }
+      } finally {
+        statusRequestInFlightRef.current = false;
       }
     };
 
     syncStatus();
-    const statusTimer = window.setInterval(syncStatus, 1000);
+    const intervalId = window.setInterval(() => {
+      if (isMounted && document.visibilityState === "visible") {
+        void syncStatus();
+      }
+    }, 1500);
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void syncStatus();
+      }
+    };
+    window.addEventListener("focus", syncStatus);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       isMounted = false;
-      window.clearInterval(statusTimer);
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", syncStatus);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 
   const openLogin = () => {
     setActiveModal("login");
+    setLoginRole("customer");
+    setCustomerLoginStep("phone");
+    setLoginPhone("");
+    setCustomerLoginOtp("");
+    setCustomerNeedsRegistration(false);
     setLoginError("");
+  };
+
+  const handleOpenProfile = async () => {
+    if (!user?.phone) {
+      openLogin();
+      return;
+    }
+
+    if (!user.customerVerified || !user.profile) {
+      openLogin();
+      return;
+    }
+
+    setIsProfileOpen(true);
   };
 
   const handleLogout = () => {
     window.localStorage.removeItem("bnb-user");
-    window.localStorage.removeItem("bnb-admin-token");
     setUser(null);
-    setActiveModal(null);
+    setIsProfileOpen(false);
   };
 
   const handleLoginSubmit = async (event) => {
@@ -224,29 +458,59 @@ function LuckyDraw() {
         });
         window.localStorage.setItem("bnb-admin-token", result.token);
         window.localStorage.removeItem("bnb-user");
-        setUser({ isAdmin: true });
-        setActiveModal(null);
+        window.location.href = "/admin";
         return;
       }
 
-      const normalizedPhone = loginPhone.replace(/\D/g, "");
+      const normalizedPhone = normalizeCustomerPhone(loginPhone);
       if (!validatePhoneNumber(normalizedPhone)) {
         throw new Error(
           "Please enter a valid 10-digit Indian WhatsApp number.",
         );
       }
 
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: normalizedPhone }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      setUser(result.user);
-      window.localStorage.setItem("bnb-user", JSON.stringify(result.user));
+      if (customerLoginStep === "phone") {
+        const lookup = await lookupCustomerRegistration(normalizedPhone);
+        if (!lookup.registered) {
+          setCustomerNeedsRegistration(true);
+          setLoginError(
+            "This number is not registered yet. Register to join the lucky draw.",
+          );
+          return;
+        }
+        if (!import.meta.env.DEV) {
+          setLoginError(
+            "This number is registered, but secure OTP sign-in is not enabled in production yet.",
+          );
+          return;
+        }
+        setCustomerNeedsRegistration(false);
+        setCustomerLoginStep("otp");
+        return;
+      }
+
+      const result = await verifyCustomerLogin(
+        normalizedPhone,
+        customerLoginOtp,
+      );
+      if (!result.profile) {
+        throw new Error(
+          "Registration details are unavailable. Please try again later.",
+        );
+      }
+      const customerUser = {
+        ...result.user,
+        profile: result.profile,
+        customerVerified: true,
+      };
+      setUser(customerUser);
+      window.localStorage.setItem("bnb-user", JSON.stringify(customerUser));
       setActiveModal(null);
+      setIsProfileOpen(true);
     } catch (error) {
+      if (error.message.includes("not registered")) {
+        setCustomerNeedsRegistration(true);
+      }
       setLoginError(error.message || "Unable to sign in");
     } finally {
       setIsLoggingIn(false);
@@ -255,6 +519,7 @@ function LuckyDraw() {
 
   const updateLuckyDrawField = (field, value) => {
     setLuckyDrawForm((currentForm) => ({ ...currentForm, [field]: value }));
+    setSubmitError("");
     if (field === "phone") {
       setIsPhoneVerified(false);
       setIsVerifyingPhone(false);
@@ -269,7 +534,7 @@ function LuckyDraw() {
     setLuckyDrawForm({
       name: "",
       phone: "",
-      occasion: "Birthday party",
+      occasion: celebrationOccasions[0] || "",
       date: "",
       guests: "2",
       consent: true,
@@ -323,25 +588,44 @@ function LuckyDraw() {
     validatePhoneNumber(cleanPhone) &&
     isPhoneVerified &&
     luckyDrawForm.occasion &&
-    luckyDrawForm.date &&
+    isFutureCelebrationDate(luckyDrawForm.date) &&
     luckyDrawForm.guests &&
     Number(luckyDrawForm.guests) > 0 &&
     luckyDrawForm.consent,
   );
+  const validationErrors = {
+    name: luckyDrawForm.name.trim() ? "" : "Please enter your full name.",
+    phone: !validatePhoneNumber(cleanPhone)
+      ? "Please enter a valid 10-digit Indian WhatsApp number."
+      : !isPhoneVerified
+        ? "Please verify your WhatsApp number."
+        : "",
+    occasion: luckyDrawForm.occasion ? "" : "Please select an occasion.",
+    date: !luckyDrawForm.date
+      ? "Please select a celebration date."
+      : isFutureCelebrationDate(luckyDrawForm.date)
+        ? ""
+        : "Celebration date must be in the future.",
+    guests:
+      Number(luckyDrawForm.guests) > 0
+        ? ""
+        : "Please enter at least 1 expected guest.",
+    consent: luckyDrawForm.consent
+      ? ""
+      : "Please agree to the WhatsApp reminders and offers.",
+  };
 
   const handleLuckyDrawSubmit = async (event) => {
     event.preventDefault();
+    setHasAttemptedSubmit(true);
     if (!isFormValid) {
-      if (!isPhoneVerified) {
-        setSubmitError("Please verify your WhatsApp number before submitting.");
-      } else {
-        setSubmitError("Please complete all form fields.");
-      }
+      setSubmitError("Please review the highlighted fields.");
       return;
     }
 
     setIsSubmitting(true);
     setSubmitError("");
+    setHasAttemptedSubmit(false);
     setSubmitSuccess(false);
 
     try {
@@ -351,23 +635,30 @@ function LuckyDraw() {
       };
       const result = await createLuckyDrawEntry(payload);
 
-      const loggedUser = result.user || {
-        name: luckyDrawForm.name.trim(),
-        phone: cleanPhone,
+      const loggedUser = {
+        ...(result.user || {
+          name: luckyDrawForm.name.trim(),
+          phone: cleanPhone,
+        }),
+        profile: result.profile,
       };
       setUser(loggedUser);
       window.localStorage.setItem("bnb-user", JSON.stringify(loggedUser));
 
-      const status = await getLuckyDrawStatus();
-      setLuckyDrawEntries(status.entries);
       setSubmitSuccess(true);
+      try {
+        const status = await getLuckyDrawStatus();
+        setLuckyDrawEntries(status.entries);
+      } catch (error) {
+        setDrawStatusError(error.message || "Unable to refresh draw entries.");
+      }
     } catch (error) {
       if (/already registered/i.test(error.message || "")) {
         setShowDuplicatePhonePopup(true);
       } else {
         setSubmitError(
           error.message ||
-            "Unable to submit your registration. Please try again.",
+          "Unable to submit your registration. Please try again.",
         );
       }
     } finally {
@@ -395,11 +686,25 @@ function LuckyDraw() {
           </span>
           <span>Home</span>
         </a>
+        {!user?.isAdmin && (
+          <button
+            className="lucky-draw-profile-btn"
+            onClick={handleOpenProfile}
+            type="button"
+          >
+            {user?.phone ? "My profile" : "Sign in"}
+          </button>
+        )}
       </div>
 
       <section className="lucky-draw-registration-hero" id="lucky-draw">
-        {/* Live Capsule Grid when showWheel is enabled from admin screen */}
-        {showWheel && (
+        {drawStatusError && (
+          <p className="form-error" role="alert">
+            {drawStatusError}
+          </p>
+        )}
+        {/* Show live draw entries when wheel is active. */}
+        {(showWheel || isDrawing) && (
           <div
             className="lucky-draw-layout"
             style={{
@@ -409,9 +714,12 @@ function LuckyDraw() {
           >
             <div className="lucky-draw-wheel-panel">
               <div className="lucky-draw-reveal-panel">
-                <span className="draw-reveal-kicker">Live Draw Entries</span>
-                <strong className={isDrawing ? "is-drawing" : ""}>
-                  {isDrawing
+                <span className="draw-reveal-kicker">
+                  Live Draw Entries
+                  {drawMonthLabel ? ` · ${drawMonthLabel}` : ""}
+                </span>
+                <strong className={isNamesBlinking ? "is-drawing" : ""}>
+                  {isNamesBlinking
                     ? "And the winner is..."
                     : luckyDrawWinner
                       ? `Winner: ${luckyDrawWinner.name}`
@@ -420,31 +728,38 @@ function LuckyDraw() {
                 <div
                   className="name-capsule-grid"
                   aria-label="Lucky draw customers"
+                  ref={entryListRef}
                 >
-                  {luckyDrawEntries.map((entry, index) => {
+                  {luckyDrawEntries.slice(0, visibleEntryCount).map((entry, index) => {
                     const isWinner =
-                      !isDrawing && luckyDrawWinner?.name === entry.name;
+                      !isNamesBlinking &&
+                      luckyDrawWinner?.name === entry.name;
                     return (
                       <span
                         className={[
                           "name-capsule",
                           isWinner ? "is-winner" : "",
-                          isDrawing ? "is-blinking" : "",
+                          isNamesBlinking ? "is-blinking" : "",
                         ]
                           .filter(Boolean)
                           .join(" ")}
                         key={entry.id}
-                        style={{
-                          animationDelay: `${(index * 83) % 900}ms`,
-                          animationDuration: `${1.2 + (index % 4) * 0.38}s`,
-                        }}
+                        style={{ animationDelay: `${(index * 83) % 900}ms` }}
                       >
                         {entry.name}
                       </span>
                     );
                   })}
+                  {hasMoreEntries && (
+                    <span
+                      aria-hidden="true"
+                      className="scroll-load-sentinel"
+                      ref={entryListSentinelRef}
+                    />
+                  )}
                 </div>
                 <small>
+                  Showing {Math.min(visibleEntryCount, luckyDrawEntries.length)} of{" "}
                   {luckyDrawEntries.length} entries in this month&apos;s draw
                 </small>
               </div>
@@ -453,46 +768,48 @@ function LuckyDraw() {
         )}
 
         {/* Floating Left-Edge Winner Widget when winner exists */}
-        {luckyDrawWinner && (
-          <div
-            className="floating-winner-widget"
-            onClick={() => setShowWinnerPopup(true)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") setShowWinnerPopup(true);
-            }}
-            aria-label="View winner poster"
-          >
-            <div className="winner-widget-header">
-              <span className="winner-widget-badge">👑 MONTHLY WINNER</span>
-              <span className="widget-sparkle-icon">🎉</span>
-            </div>
-
-            <div className="winner-widget-body">
-              <div className="winner-name-badge-wrapper">
-                <span className="winner-name-glowing-pill">
-                  {luckyDrawWinner.name}
+        {Boolean(luckyDrawWinner) && (
+            <div
+              className="floating-winner-widget"
+              onClick={() => setShowWinnerPopup(true)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setShowWinnerPopup(true);
+              }}
+              aria-label="View winner poster"
+            >
+              <div className="winner-widget-header">
+                <span className="winner-widget-badge">
+                  👑 MONTHLY WINNER{drawMonthLabel ? ` · ${drawMonthLabel}` : ""}
                 </span>
+                <span className="widget-sparkle-icon">🎉</span>
               </div>
-              <button
-                className="view-poster-glowing-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowWinnerPopup(true);
-                }}
-                type="button"
-              >
-                <span className="poster-label-full">View Winner Poster</span>
-                <span className="poster-label-compact">Poster</span>
-                <span className="btn-sparkle">✨ ↗</span>
-              </button>
+
+              <div className="winner-widget-body">
+                <div className="winner-name-badge-wrapper">
+                  <span className="winner-name-glowing-pill">
+                    {luckyDrawWinner.name}
+                  </span>
+                </div>
+                <button
+                  className="view-poster-glowing-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowWinnerPopup(true);
+                  }}
+                  type="button"
+                >
+                  <span className="poster-label-full">View Winner Poster</span>
+                  <span className="poster-label-compact">Poster</span>
+                  <span className="btn-sparkle">✨ ↗</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Registration Form Wrapper */}
-        {!showWheel && (
+        {!showWheel && !isDrawing && (
           <div className="lucky-draw-card-wrapper">
             <img
               className="registration-form-mascot"
@@ -502,6 +819,7 @@ function LuckyDraw() {
             <form
               className="registration-card-form"
               onSubmit={handleLuckyDrawSubmit}
+              noValidate
             >
               {/* Full Name */}
               <div className="reg-field">
@@ -521,6 +839,19 @@ function LuckyDraw() {
                     id="lucky-draw-name"
                     type="text"
                     value={luckyDrawForm.name}
+                    aria-invalid={
+                      hasAttemptedSubmit && Boolean(validationErrors.name)
+                    }
+                    aria-describedby={
+                      hasAttemptedSubmit && validationErrors.name
+                        ? "lucky-draw-name-error"
+                        : undefined
+                    }
+                    className={
+                      hasAttemptedSubmit && validationErrors.name
+                        ? "is-invalid"
+                        : ""
+                    }
                     onChange={(event) =>
                       updateLuckyDrawField("name", event.target.value)
                     }
@@ -528,6 +859,11 @@ function LuckyDraw() {
                     required
                   />
                 </div>
+                {hasAttemptedSubmit && validationErrors.name && (
+                  <p className="field-error-text" id="lucky-draw-name-error">
+                    {validationErrors.name}
+                  </p>
+                )}
               </div>
 
               {/* WhatsApp Number */}
@@ -548,14 +884,34 @@ function LuckyDraw() {
                     id="lucky-draw-phone"
                     type="tel"
                     pattern="[0-9]{10}"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={luckyDrawForm.phone}
+                    aria-invalid={
+                      hasAttemptedSubmit && Boolean(validationErrors.phone)
+                    }
+                    aria-describedby={
+                      phoneError || (hasAttemptedSubmit && validationErrors.phone)
+                        ? "lucky-draw-phone-error"
+                        : undefined
+                    }
                     onChange={(event) =>
-                      updateLuckyDrawField("phone", event.target.value)
+                      updateLuckyDrawField(
+                        "phone",
+                        event.target.value.replace(/\D/g, "").slice(0, 10),
+                      )
                     }
                     placeholder="10-digit WhatsApp number"
-                    className={
-                      isPhoneVerified ? "has-verified-badge" : "has-verify-btn"
-                    }
+                    className={[
+                      isPhoneVerified
+                        ? "has-verified-badge"
+                        : "has-verify-btn",
+                      hasAttemptedSubmit && validationErrors.phone
+                        ? "is-invalid"
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     required
                   />
                   {isPhoneVerified ? (
@@ -563,14 +919,25 @@ function LuckyDraw() {
                   ) : (
                     <button
                       type="button"
-                      className="verify-num-btn"
+                      className={`verify-num-btn${luckyDrawForm.phone.length === 10 ? " is-ready" : ""}`}
                       onClick={handleSendOtp}
                     >
-                      Verify Number
+                      <span className="verify-button-desktop-label">
+                        Verify Number
+                      </span>
+                      <span className="verify-button-mobile-label">Verify</span>
                     </button>
                   )}
                 </div>
-                {phoneError && <p className="field-error-text">{phoneError}</p>}
+                {(phoneError ||
+                  (hasAttemptedSubmit && validationErrors.phone)) && (
+                    <p
+                      className="field-error-text"
+                      id="lucky-draw-phone-error"
+                    >
+                      {phoneError || validationErrors.phone}
+                    </p>
+                  )}
                 {isVerifyingPhone && !isPhoneVerified && (
                   <div className="otp-verification-box">
                     <p className="otp-label">
@@ -625,19 +992,50 @@ function LuckyDraw() {
                   <select
                     id="lucky-draw-occasion"
                     value={luckyDrawForm.occasion}
+                    disabled={!celebrationOccasions.length}
+                    aria-invalid={
+                      hasAttemptedSubmit && Boolean(validationErrors.occasion)
+                    }
+                    aria-describedby={
+                      hasAttemptedSubmit && validationErrors.occasion
+                        ? "lucky-draw-occasion-error"
+                        : undefined
+                    }
+                    className={
+                      hasAttemptedSubmit && validationErrors.occasion
+                        ? "is-invalid"
+                        : ""
+                    }
                     onChange={(event) =>
                       updateLuckyDrawField("occasion", event.target.value)
                     }
                     required
                   >
+                    {!celebrationOccasions.length && (
+                      <option value="">Loading occasions...</option>
+                    )}
                     {celebrationOccasions.map((occasion) => (
                       <option key={occasion} value={occasion}>
                         {occasion}
                       </option>
                     ))}
                   </select>
-                  <span className="select-dropdown-arrow">▾</span>
+                  <svg
+                    className="select-dropdown-arrow"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
                 </div>
+                {hasAttemptedSubmit && validationErrors.occasion && (
+                  <p
+                    className="field-error-text"
+                    id="lucky-draw-occasion-error"
+                  >
+                    {validationErrors.occasion}
+                  </p>
+                )}
               </div>
 
               {/* Celebration Date */}
@@ -657,7 +1055,21 @@ function LuckyDraw() {
                   <input
                     id="lucky-draw-date"
                     type="date"
+                    min={getMinimumCelebrationDate()}
                     value={luckyDrawForm.date}
+                    aria-invalid={
+                      hasAttemptedSubmit && Boolean(validationErrors.date)
+                    }
+                    aria-describedby={
+                      hasAttemptedSubmit && validationErrors.date
+                        ? "lucky-draw-date-error"
+                        : undefined
+                    }
+                    className={
+                      hasAttemptedSubmit && validationErrors.date
+                        ? "is-invalid"
+                        : ""
+                    }
                     onChange={(event) =>
                       updateLuckyDrawField("date", event.target.value)
                     }
@@ -665,6 +1077,11 @@ function LuckyDraw() {
                     required
                   />
                 </div>
+                {hasAttemptedSubmit && validationErrors.date && (
+                  <p className="field-error-text" id="lucky-draw-date-error">
+                    {validationErrors.date}
+                  </p>
+                )}
               </div>
 
               {/* Expected Guests */}
@@ -686,6 +1103,19 @@ function LuckyDraw() {
                     type="number"
                     min="1"
                     value={luckyDrawForm.guests}
+                    aria-invalid={
+                      hasAttemptedSubmit && Boolean(validationErrors.guests)
+                    }
+                    aria-describedby={
+                      hasAttemptedSubmit && validationErrors.guests
+                        ? "lucky-draw-guests-error"
+                        : undefined
+                    }
+                    className={
+                      hasAttemptedSubmit && validationErrors.guests
+                        ? "is-invalid"
+                        : ""
+                    }
                     onChange={(event) =>
                       updateLuckyDrawField("guests", event.target.value)
                     }
@@ -693,6 +1123,14 @@ function LuckyDraw() {
                     required
                   />
                 </div>
+                {hasAttemptedSubmit && validationErrors.guests && (
+                  <p
+                    className="field-error-text"
+                    id="lucky-draw-guests-error"
+                  >
+                    {validationErrors.guests}
+                  </p>
+                )}
               </div>
 
               {/* Consent Checkbox */}
@@ -701,6 +1139,19 @@ function LuckyDraw() {
                   id="lucky-draw-consent"
                   type="checkbox"
                   checked={luckyDrawForm.consent}
+                  className={
+                    hasAttemptedSubmit && validationErrors.consent
+                      ? "is-invalid"
+                      : ""
+                  }
+                  aria-invalid={
+                    hasAttemptedSubmit && Boolean(validationErrors.consent)
+                  }
+                  aria-describedby={
+                    hasAttemptedSubmit && validationErrors.consent
+                      ? "lucky-draw-consent-error"
+                      : undefined
+                  }
                   onChange={(event) =>
                     updateLuckyDrawField("consent", event.target.checked)
                   }
@@ -711,12 +1162,20 @@ function LuckyDraw() {
                   BOOKING INFORMATION AND PROMOTIONAL OFFERS ON WHATSAPP.
                 </label>
               </div>
+              {hasAttemptedSubmit && validationErrors.consent && (
+                <p
+                  className="field-error-text consent-error"
+                  id="lucky-draw-consent-error"
+                >
+                  {validationErrors.consent}
+                </p>
+              )}
 
               {/* CTA Button */}
               <button
                 className="reg-submit-btn"
                 type="submit"
-                disabled={!isFormValid || isSubmitting}
+                disabled={isSubmitting}
               >
                 <span>
                   {isSubmitting
@@ -725,23 +1184,6 @@ function LuckyDraw() {
                 </span>
                 <span className="btn-arrow">→</span>
               </button>
-              {!isFormValid && (
-                <p
-                  className="form-hint"
-                  style={{
-                    textAlign: "center",
-                    color: "#64748b",
-                    fontSize: "11px",
-                    marginTop: "-4px",
-                    marginBottom: "0",
-                  }}
-                >
-                  {!isPhoneVerified
-                    ? "* Verify your WhatsApp number to enable registration"
-                    : "* Please fill all required fields to proceed"}
-                </p>
-              )}
-
               {submitError && (
                 <p
                   className="form-error"
@@ -789,7 +1231,7 @@ function LuckyDraw() {
             </p>
             <h2 id="registration-result-title">
               {submitSuccess
-                ? "You&apos;re registered."
+                ? "You're registered."
                 : "Phone number already registered."}
             </h2>
             <p>
@@ -815,7 +1257,7 @@ function LuckyDraw() {
           role="presentation"
         >
           <div
-            className="modal-card"
+            className="modal-card login-modal-card"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -828,12 +1270,23 @@ function LuckyDraw() {
             >
               ×
             </button>
-            <p className="eyebrow dark">Member access</p>
+            <div className="login-modal-brand">
+              <span aria-hidden="true">B</span>
+              <div>
+                <p className="eyebrow dark">Binge &amp; Bliss</p>
+                <small>MEMBER ACCESS</small>
+              </div>
+            </div>
             <div className="login-role-toggle" aria-label="Login type">
               <button
                 className={loginRole === "customer" ? "is-active" : ""}
+                aria-pressed={loginRole === "customer"}
                 onClick={() => {
                   setLoginRole("customer");
+                  setCustomerLoginStep("phone");
+                  setLoginPhone("");
+                  setCustomerLoginOtp("");
+                  setCustomerNeedsRegistration(false);
                   setLoginError("");
                 }}
                 type="button"
@@ -842,8 +1295,11 @@ function LuckyDraw() {
               </button>
               <button
                 className={loginRole === "admin" ? "is-active" : ""}
+                aria-pressed={loginRole === "admin"}
                 onClick={() => {
                   setLoginRole("admin");
+                  setCustomerLoginStep("phone");
+                  setCustomerLoginOtp("");
                   setLoginError("");
                 }}
                 type="button"
@@ -852,12 +1308,18 @@ function LuckyDraw() {
               </button>
             </div>
             <h2>
-              {loginRole === "admin" ? "Admin access." : "Welcome back to BNB."}
+              {loginRole === "admin"
+                ? "Admin access."
+                : customerLoginStep === "otp"
+                  ? "Verify your number."
+                  : "View your registration."}
             </h2>
             <p>
               {loginRole === "admin"
                 ? "Sign in to access draw settings."
-                : "Enter your registered WhatsApp number to view the live lucky draw wheel."}
+                : customerLoginStep === "otp"
+                  ? `Enter the verification code for ${normalizeCustomerPhone(loginPhone)}.`
+                  : "Enter the WhatsApp number you used to register."}
             </p>
             <form className="modal-form" onSubmit={handleLoginSubmit}>
               {loginRole === "admin" ? (
@@ -880,31 +1342,198 @@ function LuckyDraw() {
                     placeholder="Admin password"
                     required
                   />
+                  <button
+                    className="login-test-prefill"
+                    onClick={() => {
+                      if (import.meta.env.DEV) {
+                        setAdminEmail(testAdminCredentials.email);
+                        setAdminPassword(testAdminCredentials.password);
+                      } else {
+                        setAdminEmail("admin@bingenbliss.com");
+                      }
+                      setLoginError("");
+                    }}
+                    type="button"
+                  >
+                    {import.meta.env.DEV
+                      ? "Fill development admin"
+                      : "Prefill admin email"}
+                  </button>
+                  <p className="login-test-hint">
+                    {import.meta.env.DEV
+                      ? "Works only with the local development backend."
+                      : "Enter your admin password to sign in."}
+                  </p>
                 </>
               ) : (
                 <>
-                  <label htmlFor="draw-login-phone">WhatsApp number</label>
-                  <input
-                    id="draw-login-phone"
-                    type="tel"
-                    pattern="[0-9]{10}"
-                    value={loginPhone}
-                    onChange={(event) => setLoginPhone(event.target.value)}
-                    placeholder="10-digit WhatsApp number"
-                    required
-                  />
+                  {customerLoginStep === "phone" ? (
+                    <>
+                      <label htmlFor="draw-login-phone">WhatsApp number</label>
+                      <input
+                        id="draw-login-phone"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        value={loginPhone}
+                        onChange={(event) => {
+                          setLoginPhone(
+                            event.target.value.replace(/\D/g, "").slice(-12),
+                          );
+                          setCustomerNeedsRegistration(false);
+                          setLoginError("");
+                        }}
+                        placeholder="10-digit WhatsApp number"
+                        required
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <label htmlFor="draw-login-otp">
+                        Verification code
+                      </label>
+                      <input
+                        id="draw-login-otp"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={4}
+                        value={customerLoginOtp}
+                        onChange={(event) =>
+                          setCustomerLoginOtp(
+                            event.target.value.replace(/\D/g, "").slice(0, 4),
+                          )
+                        }
+                        placeholder="4-digit code"
+                        required
+                      />
+                      <button
+                        className="login-test-prefill"
+                        onClick={() => {
+                          setCustomerLoginStep("phone");
+                          setCustomerLoginOtp("");
+                          setLoginError("");
+                        }}
+                        type="button"
+                      >
+                        Change phone number
+                      </button>
+                      {import.meta.env.DEV && (
+                        <p className="login-test-hint">
+                          Development test code: 7374. No real message is sent.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </>
               )}
               {loginError && <p className="form-error">{loginError}</p>}
+              {customerNeedsRegistration && loginRole === "customer" && (
+                <a
+                  className="login-register-link"
+                  href="/lucky-draw#lucky-draw"
+                  onClick={() => setActiveModal(null)}
+                >
+                  Register for the lucky draw <span aria-hidden="true">↗</span>
+                </a>
+              )}
               <button
                 className="dark-button"
                 disabled={isLoggingIn}
                 type="submit"
               >
-                {isLoggingIn ? "Signing in..." : "Continue"} <span>↗</span>
+                {isLoggingIn
+                  ? "Please wait..."
+                  : loginRole === "admin"
+                    ? "Continue"
+                    : customerLoginStep === "phone"
+                      ? "Continue"
+                      : "Verify code"}{" "}
+                <span>↗</span>
               </button>
             </form>
+            <p className="login-privacy-note">
+              <span aria-hidden="true">✦</span>
+              Use your registered number to view its saved entry details.
+            </p>
           </div>
+        </div>
+      )}
+
+      {isProfileOpen && (
+        <div
+          className="modal-backdrop customer-profile-backdrop"
+          onClick={() => setIsProfileOpen(false)}
+          role="presentation"
+        >
+          <section
+            className="modal-card customer-profile-card"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customer-profile-title"
+          >
+            <button
+              className="modal-close"
+              onClick={() => setIsProfileOpen(false)}
+              type="button"
+              aria-label="Close profile"
+            >
+              ×
+            </button>
+            <p className="eyebrow dark">Customer account</p>
+            <h2 id="customer-profile-title">Your registration</h2>
+            <p className="customer-profile-intro">
+              Review the details saved with your lucky draw entry.
+            </p>
+            <dl className="customer-profile-grid">
+              <div>
+                <dt>Full name</dt>
+                <dd>{user?.profile?.name || "Not provided"}</dd>
+              </div>
+              <div>
+                <dt>WhatsApp number</dt>
+                <dd>{user?.profile?.phone || "Not provided"}</dd>
+              </div>
+              <div>
+                <dt>Special occasion</dt>
+                <dd>{user?.profile?.occasion || "Not provided"}</dd>
+              </div>
+              <div>
+                <dt>Celebration date</dt>
+                <dd>
+                  {formatCustomerDate(user?.profile?.celebrationDate)}
+                </dd>
+              </div>
+              <div>
+                <dt>Expected guests</dt>
+                <dd>{user?.profile?.guests || "Not provided"}</dd>
+              </div>
+              <div>
+                <dt>Registered on</dt>
+                <dd>
+                  {formatRegistrationDateTime(user?.profile?.registeredAt)}
+                  {user?.profile?.registeredAt && " IST"}
+                </dd>
+              </div>
+            </dl>
+            <div className="customer-profile-actions">
+              <button
+                className="dark-button"
+                onClick={handleLogout}
+                type="button"
+              >
+                Sign out
+              </button>
+              <button
+                className="customer-profile-close"
+                onClick={() => setIsProfileOpen(false)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+          </section>
         </div>
       )}
 
@@ -1026,7 +1655,7 @@ function LuckyDraw() {
 
             <div className="spinning-wheel-status">
               <h2>Spinning the Lucky Wheel...</h2>
-              <p>Selecting this month&apos;s lucky draw winner!</p>
+              <p>Selecting this month's lucky draw winner!</p>
             </div>
           </div>
         </div>
@@ -1065,9 +1694,31 @@ function LuckyDraw() {
 
               <div className="template-overlay-layer">
                 {/* Occasion Ribbon Text - Winner Name */}
-                <div className="overlay-ribbon-text">
-                  {luckyDrawWinner.name}
-                </div>
+                <svg
+                  className="overlay-ribbon-text"
+                  viewBox="0 0 100 32"
+                  role="img"
+                  aria-label={`Winner: ${luckyDrawWinner.name}`}
+                >
+                  <defs>
+                    <path
+                      id="customer-winner-name-curve"
+                      d="M 8 27 Q 50 5 92 27"
+                    />
+                  </defs>
+                  <text>
+                    <textPath
+                      href="#customer-winner-name-curve"
+                      xlinkHref="#customer-winner-name-curve"
+                      startOffset="50%"
+                      textAnchor="middle"
+                      textLength="82"
+                      lengthAdjust="spacingAndGlyphs"
+                    >
+                      {luckyDrawWinner.name}
+                    </textPath>
+                  </text>
+                </svg>
 
                 {/* Slot 2: Celebration Date */}
                 <div className="overlay-slot slot-date">
@@ -1099,16 +1750,6 @@ function LuckyDraw() {
               </div>
             </div>
 
-            {/* Action Button at bottom */}
-            <div className="template-card-footer-actions">
-              <button
-                className="winner-claim-btn"
-                onClick={() => setShowWinnerPopup(false)}
-                type="button"
-              >
-                Claim Your Surprise <span>✨</span>
-              </button>
-            </div>
           </div>
         </div>
       )}

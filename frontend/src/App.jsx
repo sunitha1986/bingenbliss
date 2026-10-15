@@ -1,29 +1,50 @@
+import { useEffect } from "react";
 import LandingPage from "./pages/LandingPage";
+import FloatingContactActions from "./components/FloatingContactActions";
 import AdminLuckyDraw from "./pages/AdminLuckyDraw";
 import AdminCustomers from "./pages/AdminCustomers";
+import AdminOccasions from "./pages/AdminOccasions";
 import LuckyDraw from "./pages/LuckyDraw";
 import WinnerHistory from "./pages/WinnerHistory";
 
 function App() {
-  const adminToken = window.localStorage.getItem("bnb-admin-token");
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  const isAdminRoute =
+    pathname === "/admin" ||
+    pathname === "/admin/lucky-draw" ||
+    pathname === "/admin/occasions" ||
+    pathname === "/admin/customers" ||
+    pathname === "/admin/winner-history";
 
-  if (
-    window.location.pathname === "/admin/lucky-draw" ||
-    window.location.pathname === "/admin/customers" ||
-    window.location.pathname === "/admin/winner-history" ||
-    (window.location.pathname === "/" && adminToken)
-  ) {
-    if (window.location.pathname === "/admin/customers") {
+  useEffect(() => {
+    document.title = isAdminRoute
+      ? "Binge & Bliss | Admin"
+      : "Binge & Bliss | Party & Celebration Venues";
+  }, [isAdminRoute]);
+
+  if (isAdminRoute) {
+    if (!window.localStorage.getItem("bnb-admin-token")) {
+      return <AdminLuckyDraw />;
+    }
+    if (pathname === "/admin/customers") {
       return <AdminCustomers />;
     }
-    if (window.location.pathname === "/admin/winner-history") {
+    if (pathname === "/admin/occasions") {
+      return <AdminOccasions />;
+    }
+    if (pathname === "/admin/winner-history") {
       return <WinnerHistory />;
     }
     return <AdminLuckyDraw />;
   }
 
-  if (window.location.pathname === "/lucky-draw") return <LuckyDraw />;
-  return <LandingPage />;
+  if (pathname === "/lucky-draw") return <LuckyDraw />;
+  return (
+    <>
+      <LandingPage />
+      <FloatingContactActions />
+    </>
+  );
 }
 
 export default App;

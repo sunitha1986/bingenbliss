@@ -94,6 +94,69 @@
       "coupon": "BLISS10",
       "couponUsed": false,
       "createdAt": "2026-09-29T09:59:23.000Z"
+    },
+    {
+      "id": "5403019f-ae99-4ba7-9869-694dda791403",
+      "email": "9972220658@customer.bingenbliss.local",
+      "name": "Ahyan M S",
+      "phone": "9972220658",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-10-01T06:55:17.177Z"
+    },
+    {
+      "id": "cfd4c815-676b-4963-a663-298e6ca641e9",
+      "email": "9768654646@customer.bingenbliss.local",
+      "name": "Harish K",
+      "phone": "9768654646",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-10-05T09:05:50.758Z"
+    },
+    {
+      "id": "e7fbeaf3-9332-48b2-ad29-c4b19ae5c65b",
+      "email": "9851233533@customer.bingenbliss.local",
+      "name": "Anitha",
+      "phone": "9851233533",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-10-09T10:37:12.272Z"
+    },
+    {
+      "id": "762c9035-93e3-469c-be12-5b805e370390",
+      "email": "9857423102@customer.bingenbliss.local",
+      "name": "Hemanth",
+      "phone": "9857423102",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-10-09T11:27:06.002Z"
+    },
+    {
+      "id": "f98b3b6d-2985-4e9c-9df5-12ee21eaeb63",
+      "email": "9242342342@customer.bingenbliss.local",
+      "name": "Sarada M",
+      "phone": "9242342342",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-10-09T21:49:30.453Z"
+    },
+    {
+      "id": "f7b334e8-d5ed-49ca-a5f4-6c0b68a3f9dc",
+      "email": "9517538426@customer.bingenbliss.local",
+      "name": "Sri Ram",
+      "phone": "9517538426",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-10-13T06:33:43.969Z"
+    },
+    {
+      "id": "afffc117-4095-48e3-b911-df72f00ceb2d",
+      "email": "9857461253@customer.bingenbliss.local",
+      "name": "Sumana",
+      "phone": "9857461253",
+      "coupon": "BLISS10",
+      "couponUsed": false,
+      "createdAt": "2026-10-13T07:34:40.367Z"
     }
   ],
   "orders": [
@@ -179,7 +242,7 @@
     }
   ],
   "luckyDrawSettings": {
-    "wheelEnabled": true,
+    "wheelEnabled": false,
     "lastSpin": {
       "id": "c60a5c00-43d4-4392-9ed8-0a2d4d8587d8",
       "winner": {
@@ -392,6 +455,29 @@
         "spunAt": "2026-09-30T07:20:00.603Z"
       }
     ],
-    "annualEligibilityEnabled": false
+    "annualEligibilityEnabled": true,
+    "previousWinnerExclusionEnabled": false,
+    "includeAllEntriesNextDraw": false,
+    "celebrationOccasions": [
+      "Birthday party",
+      "Anniversary"
+    ],
+    "includeAllThisMonthEntriesNextDraw": false,
+    "includeAllThisMonthEntriesMonth": "",
+    "manualDrawCompleted": true,
+    "isDrawing": false,
+    "drawingUntil": 0,
+    "drawingWinner": {
+      "id": "10",
+      "Name": "Ahyan M S",
+      "Phone": "9972220658",
+      "Occasion": "Birthday party",
+      "Celebration date": "2026-10-16",
+      "Date of birth": "2026-10-16",
+      "Guests": 2,
+      "Consent": "Yes",
+      "Submitted at": "2026-10-01T06:59:17.633Z"
+    },
+    "autoResetVisibilityAt": 0
   }
 }

@@ -1,0 +1,110 @@
+.floating-contact-actions {
+  align-items: center;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  z-index: 20;
+}
+
+.floating-contact-action {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  height: 58px;
+  isolation: isolate;
+  justify-content: center;
+  position: relative;
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
+  width: 58px;
+}
+
+.floating-contact-action::before {
+  animation: contact-action-pulse 2.2s ease-out infinite;
+  border-radius: inherit;
+  content: "";
+  inset: -5px;
+  opacity: 0.65;
+  position: absolute;
+  z-index: -1;
+}
+
+.floating-contact-action:hover {
+  box-shadow: 0 10px 28px rgba(24, 18, 38, 0.32);
+  transform: translateY(-3px);
+}
+
+.floating-contact-action:focus-visible {
+  outline: 3px solid #321a62;
+  outline-offset: 4px;
+}
+
+.floating-contact-call {
+  background: #fff;
+  box-shadow: 0 7px 20px rgba(24, 18, 38, 0.3);
+  color: #34215f;
+}
+
+.floating-contact-call::before {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.floating-contact-whatsapp {
+  background: #08c65a;
+  box-shadow: 0 7px 20px rgba(12, 79, 47, 0.34);
+  color: #fff;
+}
+
+.floating-contact-whatsapp::before {
+  background: rgba(8, 198, 90, 0.55);
+}
+
+.floating-contact-action svg {
+  height: 33px;
+  width: 33px;
+}
+
+@keyframes contact-action-pulse {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
+
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+@media (max-width: 600px) {
+  .floating-contact-actions {
+    bottom: max(16px, env(safe-area-inset-bottom));
+    gap: 12px;
+    right: max(14px, env(safe-area-inset-right));
+  }
+
+  .floating-contact-action {
+    height: 52px;
+    width: 52px;
+  }
+
+  .floating-contact-action svg {
+    height: 29px;
+    width: 29px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-contact-action {
+    transition: none;
+  }
+
+  .floating-contact-action::before {
+    animation: none;
+  }
+}

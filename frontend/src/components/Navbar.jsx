@@ -1,68 +1,92 @@
 import { useState } from "react";
+import LuckyDrawBanner from "./LuckyDrawBanner";
 
-function Navbar({ user, onLogin, onLogout, standalone = false }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+function Navbar({
+  user,
+  onLogin,
+  onLogout,
+  standalone = false,
+  luckyDrawBanner = null,
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <nav className="nav-bar" aria-label="Main navigation">
-      <a className="brand" href="/" aria-label="Binge N Bliss home">
-        <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
-      </a>
-      <button
-        className="mobile-menu-toggle"
-        onClick={() => setIsMenuOpen((open) => !open)}
-        type="button"
-        aria-expanded={isMenuOpen}
-        aria-label={
-          isMenuOpen ? "Close navigation menu" : "Open navigation menu"
-        }
-      >
-        {isMenuOpen ? "×" : "☰"}
-      </button>
-      <div className={`nav-links ${isMenuOpen ? "mobile-open" : ""}`}>
-        <a
-          href={standalone ? "/" : "#top"}
-          onClick={() => setIsMenuOpen(false)}
-        >
-          Home
+    <>
+      {luckyDrawBanner && <LuckyDrawBanner banner={luckyDrawBanner} />}
+      <nav className="nav-bar" aria-label="Main navigation">
+        <a className="brand" href="/" aria-label="Binge N Bliss home">
+          <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
+          <span className="brand-name">Binge n Bliss</span>
         </a>
-        {!standalone && <a href="#events">Events</a>}
-        {!standalone && <a href="#gallery">Gallery</a>}
-        {!standalone && <a href="#contact">Contact</a>}
-        <a
-          className="lucky-draw-nav-button"
-          target="_blank"
-          href="/lucky-draw"
-          onClick={() => setIsMenuOpen(false)}
+
+        <button
+          aria-label="Toggle navigation menu"
+          aria-expanded={menuOpen}
+          className="nav-toggle"
+          onClick={() => setMenuOpen((open) => !open)}
+          type="button"
         >
-          LuckyDraw
-        </a>
-        {!standalone &&
-          (user ? (
-            <button
-              className="account-button"
-              onClick={() => {
-                setIsMenuOpen(false);
-                onLogout();
-              }}
-              type="button"
-            >
-              Sign out
-            </button>
-          ) : (
-            <button
-              className="account-button"
-              onClick={() => {
-                setIsMenuOpen(false);
-                onLogin();
-              }}
-              type="button"
-            >
-              Log in
-            </button>
-          ))}
-      </div>
-    </nav>
+          <span />
+          <span />
+          <span />
+        </button>
+
+        <div className={`nav-links ${menuOpen ? "open" : ""}`}>
+          <a href={standalone ? "/" : "#top"} onClick={() => setMenuOpen(false)}>
+            Home
+          </a>
+          {!standalone && (
+            <a href="#events" onClick={() => setMenuOpen(false)}>
+              Events
+            </a>
+          )}
+          {!standalone && (
+            <a href="#gallery" onClick={() => setMenuOpen(false)}>
+              Gallery
+            </a>
+          )}
+          {!standalone && (
+            <a href="#contact" onClick={() => setMenuOpen(false)}>
+              Contact
+            </a>
+          )}
+          <a
+            className="lucky-draw-nav-button"
+            href="/lucky-draw"
+            onClick={() => setMenuOpen(false)}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            LuckyDraw
+          </a>
+          {!standalone &&
+            (user ? (
+              <button
+                className="account-button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLogout?.();
+                }}
+                type="button"
+              >
+                Sign out
+              </button>
+            ) : (
+              <button
+                className="account-button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLogin?.();
+                }}
+                type="button"
+              >
+                Log in
+              </button>
+            ))}
+        </div>
+      </nav>
+    </>
+
   );
 }
 

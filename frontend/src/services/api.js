@@ -1,7 +1,9 @@
+import config from "../config.js";
+
 async function request(path, options) {
   let response;
   try {
-    response = await fetch(path, options);
+    response = await fetch(`${config.API_BASE_URL}${path}`, options);
   } catch {
     throw new Error(
       "Unable to reach the backend. Start the backend server and try again.",
@@ -30,11 +32,27 @@ async function request(path, options) {
   return result;
 }
 
-export function login(email) {
+export function login(payload) {
   return request("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function lookupCustomerRegistration(phone) {
+  return request("/api/auth/customer-lookup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone }),
+  });
+}
+
+export function verifyCustomerLogin(phone, code) {
+  return request("/api/auth/customer-verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, code }),
   });
 }
 
@@ -63,8 +81,20 @@ export function createLuckyDrawEntry(payload) {
 }
 
 export function getLuckyDrawStatus() {
-  return request("/api/lucky-draw/status");
+  return request("/api/lucky-draw/status").then((status) => {
+    if (!Array.isArray(status.entries)) {
+      throw new Error(
+        "Lucky draw status is unavailable. Check that the backend is running and the frontend /api proxy is configured.",
+      );
+    }
+    return status;
+  });
 }
+
+export function getLuckyDrawLatestWinner() {
+  return request("/api/lucky-draw/latest-winner");
+}
+
 
 export function getLuckyDrawWinners(token) {
   return request("/api/admin/lucky-draw/winners", {
@@ -80,15 +110,41 @@ export function adminLogin(payload) {
   });
 }
 
-export function spinLuckyDraw(token) {
+export function spinLuckyDraw(token, payload = {}) {
   return request("/api/admin/lucky-draw/spin", {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 }
 
 export function setLuckyDrawVisibility(token, enabled) {
   return request("/api/admin/lucky-draw/visibility", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export function setLuckyDrawIncludeAllEntriesNextDraw(token, enabled) {
+  return request("/api/admin/lucky-draw/eligibility-reset", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export function setLuckyDrawIncludeAllThisMonthEntriesNextDraw(token, enabled) {
+  return request("/api/admin/lucky-draw/include-this-month-entries", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -106,6 +162,17 @@ export function updateLuckyDrawFeatures(token, settings) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(settings),
+  });
+}
+
+export function updateLuckyDrawOccasions(token, celebrationOccasions) {
+  return request("/api/admin/lucky-draw/occasions", {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ celebrationOccasions }),
   });
 }
 

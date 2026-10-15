@@ -1,9 +1,40 @@
 import crypto from "node:crypto";
 import { readStore, writeStore } from "../config/db.js";
-import { readLuckyDrawCustomers } from "../config/luckyDrawDatabase.js";
+import { normalizePhone } from "../utils/normalizePhone.js";
+import {
+  appendLuckyDrawSpin,
+  readLatestLuckyDrawSpin,
+  readLuckyDrawCustomers,
+  readLuckyDrawSpins,
+  withLuckyDrawCycleLock as withCycleLock,
+} from "../config/luckyDrawDatabase.js";
+
+const defaultCelebrationOccasions = [
+  "Birthday party",
+  "Anniversary",
+  "Kitty party",
+  "Private theatre",
+  "Mini theatre",
+  "Photography",
+  "Customize lucky draw",
+  "Other",
+];
 
 export async function getLuckyDrawWheelEnabled() {
   const store = await readStore();
+  const autoResetAt = store.luckyDrawSettings?.autoResetVisibilityAt || 0;
+  if (
+    autoResetAt &&
+    Date.now() >= autoResetAt &&
+    store.luckyDrawSettings?.wheelEnabled
+  ) {
+    store.luckyDrawSettings.wheelEnabled = false;
+    store.luckyDrawSettings.autoResetVisibilityAt = 0;
+    store.luckyDrawSettings.isDrawing = false;
+    store.luckyDrawSettings.drawingUntil = 0;
+    await writeStore(store);
+    return false;
+  }
   return Boolean(store.luckyDrawSettings?.wheelEnabled);
 }
 
@@ -12,17 +43,74 @@ export async function setLuckyDrawWheelEnabled(enabled) {
   store.luckyDrawSettings = {
     ...store.luckyDrawSettings,
     wheelEnabled: Boolean(enabled),
+    autoResetVisibilityAt: 0,
+    ...(enabled ? { manualDrawCompleted: false } : {}),
   };
   await writeStore(store);
   return store.luckyDrawSettings.wheelEnabled;
 }
 
+export async function setLuckyDrawSpinningState(isDrawing, winner = null) {
+  const store = await readStore();
+  store.luckyDrawSettings = {
+    ...store.luckyDrawSettings,
+    isDrawing: Boolean(isDrawing),
+    drawingUntil: isDrawing ? Date.now() + 9500 : 0,
+    drawingWinner: winner,
+    autoResetVisibilityAt: isDrawing ? Date.now() + 9500 : 0,
+  };
+  await writeStore(store);
+}
+
+export async function getLuckyDrawSpinningState() {
+  const store = await readStore();
+  const drawingUntil = store.luckyDrawSettings?.drawingUntil || 0;
+  const isDrawing = Boolean(
+    store.luckyDrawSettings?.isDrawing && Date.now() < drawingUntil,
+  );
+  return {
+    isDrawing,
+    drawingWinner: isDrawing ? store.luckyDrawSettings?.drawingWinner : null,
+  };
+}
+
 export async function getLuckyDrawFeatureSettings() {
   const store = await readStore();
   const settings = store.luckyDrawSettings || {};
+
   return {
     annualEligibilityEnabled: settings.annualEligibilityEnabled !== false,
+    previousWinnerExclusionEnabled:
+      typeof settings.previousWinnerExclusionEnabled === "boolean"
+        ? settings.previousWinnerExclusionEnabled
+        : settings.annualEligibilityEnabled !== false,
+    manualDrawCompleted:
+      typeof settings.manualDrawCompleted === "boolean"
+        ? settings.manualDrawCompleted
+        : null,
+    includeAllEntriesNextDraw: settings.includeAllEntriesNextDraw === true,
+    includeAllThisMonthEntriesNextDraw:
+      settings.includeAllThisMonthEntriesNextDraw === true,
+    includeAllThisMonthEntriesMonth:
+      typeof settings.includeAllThisMonthEntriesMonth === "string"
+        ? settings.includeAllThisMonthEntriesMonth
+        : "",
+    celebrationOccasions:
+      Array.isArray(settings.celebrationOccasions) &&
+      settings.celebrationOccasions.length > 0
+        ? settings.celebrationOccasions
+        : defaultCelebrationOccasions,
   };
+}
+
+export async function setLuckyDrawCelebrationOccasions(occasions) {
+  const store = await readStore();
+  store.luckyDrawSettings = {
+    ...store.luckyDrawSettings,
+    celebrationOccasions: occasions,
+  };
+  await writeStore(store);
+  return occasions;
 }
 
 export async function setLuckyDrawFeatureSettings(updates) {
@@ -30,61 +118,98 @@ export async function setLuckyDrawFeatureSettings(updates) {
   const settings = store.luckyDrawSettings || {};
   store.luckyDrawSettings = {
     ...settings,
-    ...(typeof updates.annualEligibilityEnabled === "boolean" && {
-      annualEligibilityEnabled: updates.annualEligibilityEnabled,
+    annualEligibilityEnabled: updates.annualEligibilityEnabled !== false,
+    previousWinnerExclusionEnabled: updates.previousWinnerExclusionEnabled !== false,
+  };
+  await writeStore(store);
+  return getLuckyDrawFeatureSettings();
+}
+
+export async function setLuckyDrawIncludeAllEntriesNextDraw(enabled) {
+  const store = await readStore();
+  store.luckyDrawSettings = {
+    ...store.luckyDrawSettings,
+    includeAllEntriesNextDraw: Boolean(enabled),
+    ...(enabled && {
+      includeAllThisMonthEntriesNextDraw: false,
+      includeAllThisMonthEntriesMonth: "",
     }),
   };
   await writeStore(store);
-  return {
-    annualEligibilityEnabled:
-      store.luckyDrawSettings.annualEligibilityEnabled !== false,
+  return store.luckyDrawSettings.includeAllEntriesNextDraw;
+}
+
+export async function setLuckyDrawIncludeAllThisMonthEntriesNextDraw(enabled) {
+  const store = await readStore();
+  const now = new Date();
+  const monthParts = Object.fromEntries(
+    new Intl.DateTimeFormat("en", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+    })
+      .formatToParts(now)
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value }) => [type, value]),
+  );
+  store.luckyDrawSettings = {
+    ...store.luckyDrawSettings,
+    includeAllThisMonthEntriesNextDraw: Boolean(enabled),
+    includeAllThisMonthEntriesMonth: enabled
+      ? `${monthParts.year}-${monthParts.month}`
+      : "",
+    ...(enabled && { includeAllEntriesNextDraw: false }),
   };
+  await writeStore(store);
+  return {
+    includeAllThisMonthEntriesNextDraw:
+      store.luckyDrawSettings.includeAllThisMonthEntriesNextDraw,
+    includeAllThisMonthEntriesMonth:
+      store.luckyDrawSettings.includeAllThisMonthEntriesMonth,
+  };
+}
+
+export async function clearLuckyDrawNextDrawEligibilityOptions() {
+  const store = await readStore();
+  store.luckyDrawSettings = {
+    ...store.luckyDrawSettings,
+    includeAllEntriesNextDraw: false,
+    includeAllThisMonthEntriesNextDraw: false,
+    includeAllThisMonthEntriesMonth: "",
+  };
+  await writeStore(store);
+}
+
+export async function setLuckyDrawManualDrawCompleted() {
+  const store = await readStore();
+  store.luckyDrawSettings = {
+    ...store.luckyDrawSettings,
+    manualDrawCompleted: true,
+  };
+  await writeStore(store);
 }
 
 export async function getLuckyDrawLastSpin() {
-  const store = await readStore();
-  return store.luckyDrawSettings?.lastSpin || null;
+  return readLatestLuckyDrawSpin();
 }
 
 export async function getLuckyDrawWinnerHistory() {
-  const store = await readStore();
-  const settings = store.luckyDrawSettings || {};
-  const winnerHistory = Array.isArray(settings.winnerHistory)
-    ? [...settings.winnerHistory]
-    : [];
-
-  if (
-    settings.lastSpin &&
-    !winnerHistory.some((spin) => spin.id === settings.lastSpin.id)
-  ) {
-    winnerHistory.push(settings.lastSpin);
-  }
-
-  return winnerHistory;
+  return readLuckyDrawSpins();
 }
 
-export async function recordLuckyDrawSpin(winner) {
-  const store = await readStore();
-  const settings = store.luckyDrawSettings || {};
-  const lastSpin = {
-    id: crypto.randomUUID(),
-    winner,
-    spunAt: new Date().toISOString(),
-  };
-  store.luckyDrawSettings = {
-    ...settings,
-    lastSpin,
-    winnerHistory: [
-      ...(Array.isArray(settings.winnerHistory) ? settings.winnerHistory : []),
-      ...(settings.lastSpin &&
-      !settings.winnerHistory?.some((spin) => spin.id === settings.lastSpin.id)
-        ? [settings.lastSpin]
-        : []),
-      lastSpin,
-    ],
-  };
-  await writeStore(store);
-  return lastSpin;
+export async function recordLuckyDrawSpin(winner, options) {
+  return appendLuckyDrawSpin(
+    {
+      id: crypto.randomUUID(),
+      winner,
+      spunAt: new Date().toISOString(),
+    },
+    options,
+  );
+}
+
+export function withLuckyDrawCycleLock(cycle, action) {
+  return withCycleLock(cycle, action);
 }
 
 export function publicUser(user) {
@@ -100,12 +225,15 @@ export function publicUser(user) {
 
 export async function findOrCreateUserByPhone(phone) {
   const store = await readStore();
-  let user = store.users.find((candidate) => candidate.phone === phone);
+  let user = store.users.find(
+    (candidate) => normalizePhone(candidate.phone) === phone,
+  );
 
   if (!user) {
     const customers = await readLuckyDrawCustomers();
     const customer = customers.find(
-      (candidate) => String(candidate.Phone) === phone,
+      (candidate) =>
+        normalizePhone(candidate.Phone || candidate.phone) === phone,
     );
     if (!customer) return null;
 
@@ -119,6 +247,9 @@ export async function findOrCreateUserByPhone(phone) {
       createdAt: new Date().toISOString(),
     };
     store.users.push(user);
+    await writeStore(store);
+  } else if (user.phone !== phone) {
+    user.phone = phone;
     await writeStore(store);
   }
 

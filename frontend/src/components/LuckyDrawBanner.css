@@ -1,0 +1,388 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap");
+
+.nav-draw-banner {
+  background: linear-gradient(100deg, #35132f, #9c3d70, #e99a8a);
+  border-bottom: 1px solid rgba(255, 228, 170, 0.7);
+  box-shadow: 0 8px 28px rgba(29, 7, 34, 0.32);
+  color: #fff7e9;
+  height: clamp(40px, 3.75vw, 50px);
+  overflow: hidden;
+  position: relative;
+  z-index: 3;
+}
+
+.nav-draw-banner-inner {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  width: 100%;
+}
+
+.banner-main-row {
+  align-items: center;
+  box-sizing: border-box;
+  display: grid;
+  flex: 1 1 auto;
+  gap: clamp(8px, 2vw, 24px);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  padding: 0 clamp(10px, 2vw, 20px);
+  position: relative;
+}
+
+/* === Title Cluster & Glowing Trail === */
+.banner-main-row > .banner-title-cluster {
+  grid-column: 1;
+  justify-self: start;
+  margin: 0;
+}
+
+.banner-title-cluster {
+  align-items: center;
+  display: inline-flex;
+  gap: clamp(6px, 1vw, 12px);
+  padding: 3px 12px;
+  position: relative;
+}
+
+.banner-title-cluster::before,
+.banner-title-cluster::after {
+  border-radius: 9999px;
+  content: "";
+  inset: -2px -4px;
+  pointer-events: none;
+  position: absolute;
+  animation: banner-trail-pulse 3s ease-in-out infinite;
+}
+
+.banner-title-cluster::before {
+  border: 1.5px solid rgba(255, 205, 85, 0.75);
+  box-shadow: 0 0 16px rgba(255, 105, 180, 0.7), inset 0 0 10px rgba(255, 205, 85, 0.45);
+}
+
+.banner-title-cluster::after {
+  border: 1px solid rgba(255, 111, 198, 0.65);
+  box-shadow: 0 0 22px rgba(255, 49, 190, 0.6);
+  animation-delay: 1.5s;
+}
+
+/* === Gift Boxes === */
+.banner-gift {
+  display: block;
+  flex: 0 0 clamp(20px, 2vw, 26px);
+  height: clamp(20px, 2vw, 26px);
+  position: relative;
+  width: clamp(20px, 2vw, 26px);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.28));
+}
+
+.banner-gift-box {
+  background: linear-gradient(135deg, #ff2a7a, #d4145a);
+  border: 1px solid rgba(255, 239, 211, 0.7);
+  border-radius: 3px;
+  bottom: 1px;
+  height: 60%;
+  left: 8%;
+  position: absolute;
+  width: 84%;
+}
+
+.banner-gift-box::after {
+  background: #ffd54f;
+  content: "";
+  height: 100%;
+  left: calc(50% - 2px);
+  position: absolute;
+  top: 0;
+  width: 4px;
+}
+
+.banner-gift-lid {
+  background: linear-gradient(135deg, #ffd54f, #ffb300);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 2px;
+  bottom: 60%;
+  height: 22%;
+  left: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.banner-gift-bow {
+  border: 2.5px solid #ffd54f;
+  border-radius: 50% 50% 0 50%;
+  height: 38%;
+  left: 28%;
+  position: absolute;
+  top: -2px;
+  transform: rotate(35deg);
+  width: 38%;
+}
+
+.banner-gift-bow::after {
+  border: 2.5px solid #ffd54f;
+  border-radius: 50% 50% 50% 0;
+  content: "";
+  height: 100%;
+  left: 15%;
+  position: absolute;
+  top: -10%;
+  transform: rotate(-70deg);
+  width: 100%;
+}
+
+/* === Headline === */
+.banner-headline {
+  align-items: center;
+  display: flex;
+  font-family: "Montserrat", "Arial Black", sans-serif;
+  font-size: clamp(16px, 2vw, 24px);
+  font-weight: 900;
+  gap: clamp(3px, 0.6vw, 8px);
+  letter-spacing: 0.02em;
+  line-height: 0.9;
+  text-shadow: 0 0 16px rgba(255, 49, 190, 0.65);
+  white-space: nowrap;
+}
+
+.banner-lucky {
+  background: linear-gradient(180deg, #fffdf5 0%, #ffe486 42%, #ffc332 100%);
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(175, 51, 77, 0.7)) drop-shadow(0 0 12px rgba(255, 197, 81, 0.65));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.banner-draw {
+  background: linear-gradient(180deg, #ffffff 0%, #ffeef7 52%, #ffc9dc 100%);
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(148, 34, 99, 0.7)) drop-shadow(0 0 12px rgba(255, 111, 198, 0.62));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* === Announcements & Marquee === */
+.banner-announcements {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.banner-announcement-track {
+  align-items: center;
+  animation: banner-announcement-scroll 24s linear infinite;
+  display: flex;
+  height: 100%;
+  width: max-content;
+  will-change: transform;
+}
+
+.banner-announcements:hover .banner-announcement-track {
+  animation-play-state: paused;
+}
+
+.banner-announcement-copy {
+  align-items: center;
+  color: #fff7e9;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: "Montserrat", sans-serif;
+  font-size: clamp(10px, 0.85vw, 12px);
+  gap: clamp(10px, 1.5vw, 20px);
+  padding-right: clamp(20px, 3vw, 40px);
+  white-space: nowrap;
+}
+
+.banner-announcement-copy strong {
+  color: #ffe486;
+  font-weight: 800;
+}
+
+.banner-announcement-star {
+  color: #ffe486;
+  flex: 0 0 auto;
+  font-size: 1.1em;
+  filter: drop-shadow(0 0 4px rgba(255, 220, 91, 0.6));
+}
+
+/* === CTA Button === */
+.banner-main-row > .banner-cta {
+  grid-column: 3;
+  justify-self: end;
+  margin: 0 4px 0 0;
+}
+
+.banner-cta {
+  align-items: center;
+  background: #E12476;
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+  box-shadow: 0 0 16px rgba(255, 207, 99, 0.44), 0 6px 18px rgba(90, 19, 67, 0.28);
+  color: #ffffff;
+  display: inline-flex;
+  font-family: "Montserrat", sans-serif;
+  font-size: clamp(9px, 0.75vw, 11px);
+  font-weight: 800;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  padding: 6px clamp(12px, 1.2vw, 20px);
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+.banner-cta:hover {
+  box-shadow: 0 0 24px rgba(255, 207, 99, 0.8), 0 8px 24px rgba(114, 16, 70, 0.38);
+  color: #ffffff;
+  transform: translateY(-2px) scale(1.025);
+}
+
+/* === Floating Sparks === */
+.banner-spark {
+  color: #ffe486;
+  filter: drop-shadow(0 0 6px rgba(255, 220, 91, 0.8));
+  font-size: 13px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.banner-spark-left {
+  left: 23%;
+  top: 4px;
+}
+
+.banner-spark-mid-left {
+  left: 47%;
+  bottom: 4px;
+}
+
+.banner-spark-mid-right {
+  right: 27%;
+  top: 4px;
+}
+
+.banner-spark-right {
+  right: 14%;
+  bottom: 4px;
+}
+
+/* === Legacy Ticker Classes (if used) === */
+.banner-ticker {
+  box-sizing: border-box;
+  flex: 0 0 15px;
+  margin: 0 0 0 calc(50% - 50vw);
+  min-height: 15px;
+  padding: 0;
+  width: 100vw;
+}
+
+.banner-ticker-copy {
+  color: #4a1538;
+  font-size: clamp(6px, 0.6vw, 8px);
+  gap: clamp(5px, 1vw, 12px);
+  padding: 0 clamp(5px, 1vw, 12px);
+}
+
+.banner-ticker-star {
+  color: #4a1538;
+}
+
+/* === Keyframe Animations === */
+@keyframes banner-announcement-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes banner-trail-pulse {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(0.99);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+/* === Responsive Media Queries === */
+@media (max-width: 700px) {
+  .nav-draw-banner {
+    height: 41px;
+  }
+  .banner-main-row {
+    gap: 3px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0 5px;
+  }
+  .banner-title-cluster {
+    gap: 3px;
+    padding: 2px 4px;
+  }
+  .banner-headline {
+    font-size: clamp(12px, 2.6vw, 16px);
+    gap: 2px;
+  }
+  .banner-gift {
+    display: none;
+  }
+  .banner-main-row > .banner-title-cluster {
+    grid-column: 1;
+    justify-self: start;
+    margin: 0;
+  }
+  .banner-announcements {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .banner-announcement-copy {
+    font-size: 8px;
+    gap: 8px;
+    padding-right: 14px;
+  }
+  .banner-main-row > .banner-cta {
+    grid-column: 3;
+    border-width: 1.5px;
+    font-size: 8px;
+    max-width: 100%;
+    padding: 3px 7px;
+  }
+  .banner-spark {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .banner-main-row {
+    gap: 3px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .banner-headline {
+    font-size: clamp(9px, 2.8vw, 11px);
+  }
+  .banner-main-row > .banner-cta {
+    font-size: 7px;
+    padding: 2px 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner-title-cluster::before,
+  .banner-title-cluster::after {
+    animation: none;
+  }
+  .banner-announcement-track {
+    animation: none;
+  }
+  .banner-announcement-copy[aria-hidden="true"] {
+    display: none;
+  }
+}
