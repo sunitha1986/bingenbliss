@@ -35,6 +35,12 @@
 }
 
 /* === Title Cluster & Glowing Trail === */
+@property --banner-ring-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .banner-main-row > .banner-title-cluster {
   grid-column: 1;
   justify-self: start;
@@ -45,29 +51,44 @@
   align-items: center;
   display: inline-flex;
   gap: clamp(6px, 1vw, 12px);
-  padding: 3px 12px;
+  isolation: isolate;
+  padding: 0;
   position: relative;
 }
 
-.banner-title-cluster::before,
-.banner-title-cluster::after {
-  border-radius: 9999px;
+.banner-title-cluster::before {
   content: "";
-  inset: -2px -4px;
+  inset: -14px -24px;
   pointer-events: none;
   position: absolute;
-  animation: banner-trail-pulse 3s ease-in-out infinite;
-}
-
-.banner-title-cluster::before {
-  border: 1.5px solid rgba(255, 205, 85, 0.75);
-  box-shadow: 0 0 16px rgba(255, 105, 180, 0.7), inset 0 0 10px rgba(255, 205, 85, 0.45);
+  background:
+    radial-gradient(ellipse at 28% 55%, rgba(255, 205, 85, 0.3), transparent 58%),
+    radial-gradient(ellipse at 72% 45%, rgba(255, 49, 190, 0.42), transparent 68%);
+  filter: blur(9px);
+  opacity: 0.85;
+  z-index: -2;
 }
 
 .banner-title-cluster::after {
-  border: 1px solid rgba(255, 111, 198, 0.65);
-  box-shadow: 0 0 22px rgba(255, 49, 190, 0.6);
-  animation-delay: 1.5s;
+  animation: banner-ring-spin 9s linear infinite;
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    conic-gradient(
+      from var(--banner-ring-angle),
+      rgba(255, 205, 85, 0.95),
+      rgba(255, 49, 190, 0.9) 24%,
+      rgba(255, 238, 247, 0.8) 50%,
+      rgba(255, 205, 85, 0.9) 74%,
+      rgba(255, 49, 190, 0.95) 100%
+    ) border-box;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255, 49, 190, 0.72), 0 0 16px rgba(255, 205, 85, 0.28);
+  content: "";
+  inset: -9px -18px;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
 }
 
 /* === Gift Boxes === */
@@ -302,14 +323,9 @@
   }
 }
 
-@keyframes banner-trail-pulse {
-  0%, 100% {
-    opacity: 0.55;
-    transform: scale(0.99);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.02);
+@keyframes banner-ring-spin {
+  to {
+    --banner-ring-angle: 360deg;
   }
 }
 
@@ -325,14 +341,16 @@
   }
   .banner-title-cluster {
     gap: 3px;
-    padding: 2px 4px;
+    padding: 0;
   }
   .banner-headline {
     font-size: clamp(12px, 2.6vw, 16px);
     gap: 2px;
   }
   .banner-gift {
-    display: none;
+    flex-basis: clamp(14px, 3.2vw, 20px);
+    height: clamp(14px, 3.2vw, 20px);
+    width: clamp(14px, 3.2vw, 20px);
   }
   .banner-main-row > .banner-title-cluster {
     grid-column: 1;
@@ -375,7 +393,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .banner-title-cluster::before,
   .banner-title-cluster::after {
     animation: none;
   }
