@@ -204,6 +204,8 @@ function LuckyDraw() {
   const [showWheelOverlay, setShowWheelOverlay] = useState(false);
   const [luckyDrawWinner, setLuckyDrawWinner] = useState(() => getCachedWinner());
   const [showWinnerPopup, setShowWinnerPopup] = useState(false);
+  const phoneInputRef = useRef(null);
+  const shouldFocusDuplicatePhoneRef = useRef(false);
   const lastSpinIdRef = useRef(null);
   const completedWinnerSpinIdRef = useRef(null);
   const isAnimatingSpinRef = useRef(false);
@@ -218,6 +220,13 @@ function LuckyDraw() {
     pageSize: 24,
     rootRef: entryListRef,
   });
+
+  useEffect(() => {
+    if (!showDuplicatePhonePopup && shouldFocusDuplicatePhoneRef.current) {
+      phoneInputRef.current?.focus();
+      shouldFocusDuplicatePhoneRef.current = false;
+    }
+  }, [showDuplicatePhonePopup]);
 
   // Verification state
   const [isPhoneVerified, setIsPhoneVerified] = useState(false);
@@ -531,6 +540,16 @@ function LuckyDraw() {
   };
 
   const closeRegistrationResult = () => {
+    if (showDuplicatePhonePopup) {
+      shouldFocusDuplicatePhoneRef.current = true;
+      setShowDuplicatePhonePopup(false);
+      setHasAttemptedSubmit(true);
+      setPhoneError(
+        "This phone number is already registered. Please use a different number.",
+      );
+      return;
+    }
+
     setLuckyDrawForm({
       name: "",
       phone: "",
@@ -654,6 +673,9 @@ function LuckyDraw() {
       }
     } catch (error) {
       if (/already registered/i.test(error.message || "")) {
+        setPhoneError(
+          "This phone number is already registered. Please use a different number.",
+        );
         setShowDuplicatePhonePopup(true);
       } else {
         setSubmitError(
@@ -882,13 +904,15 @@ function LuckyDraw() {
                   </span>
                   <input
                     id="lucky-draw-phone"
+                    ref={phoneInputRef}
                     type="tel"
                     pattern="[0-9]{10}"
                     inputMode="numeric"
                     maxLength={10}
                     value={luckyDrawForm.phone}
                     aria-invalid={
-                      hasAttemptedSubmit && Boolean(validationErrors.phone)
+                      Boolean(phoneError) ||
+                      (hasAttemptedSubmit && Boolean(validationErrors.phone))
                     }
                     aria-describedby={
                       phoneError || (hasAttemptedSubmit && validationErrors.phone)
@@ -907,6 +931,7 @@ function LuckyDraw() {
                         ? "has-verified-badge"
                         : "has-verify-btn",
                       hasAttemptedSubmit && validationErrors.phone
+                        || phoneError
                         ? "is-invalid"
                         : "",
                     ]

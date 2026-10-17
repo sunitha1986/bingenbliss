@@ -222,8 +222,6 @@ function AdminCustomers() {
       occasion: customer.Occasion || "",
       celebrationDate:
         customer["Celebration date"] || customer["Date of birth"] || "",
-      dob:
-        customer["Date of birth"] || customer["Celebration date"] || "",
       guests: String(customer.Guests ?? 1),
       consent: customer.Consent || "Yes",
       submittedAt: toLocalDateTimeInput(
@@ -240,6 +238,7 @@ function AdminCustomers() {
     try {
       const result = await updateAdminCustomer(adminToken, editingId, {
         ...editForm,
+        dob: editForm.celebrationDate,
         submittedAt: new Date(editForm.submittedAt).toISOString(),
       });
       setCustomers((current) =>
@@ -535,7 +534,7 @@ function AdminCustomers() {
                         <th>Name</th>
                         <th>WhatsApp</th>
                         <th>Occasion</th>
-                        <th>Date</th>
+                        <th>Occasion Date</th>
                         <th>Guests</th>
                         <th>Consent</th>
                         <th>Submitted at</th>
@@ -665,7 +664,7 @@ function AdminCustomers() {
                       </select>
                     </label>
                     <label>
-                      Celebration date
+                      Occasion Date
                       <input
                         type="date"
                         value={editForm.celebrationDate || ""}
@@ -673,20 +672,6 @@ function AdminCustomers() {
                           setEditForm((current) => ({
                             ...current,
                             celebrationDate: event.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-                    <label>
-                      Date of birth
-                      <input
-                        type="date"
-                        value={editForm.dob || ""}
-                        onChange={(event) =>
-                          setEditForm((current) => ({
-                            ...current,
-                            dob: event.target.value,
                           }))
                         }
                         required

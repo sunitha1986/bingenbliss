@@ -33,6 +33,7 @@ import {
 } from "../models/luckyDrawModel.js";
 import { getEligibleLuckyDrawCustomers } from "../services/luckyDrawEligibility.js";
 import {
+  getIndiaDrawCountsByMonth,
   getIndiaDrawCycle,
   getIndiaDrawDate,
 } from "../utils/indiaDate.js";
@@ -408,6 +409,8 @@ export async function luckyDrawStatus(request, response, next) {
       },
     );
     const currentCycle = getIndiaDrawCycle();
+    const { year: drawCountYear, counts: drawCountsByMonth } =
+      getIndiaDrawCountsByMonth(winnerHistory);
     const hasWinnerForCurrentCycle = winnerHistory.some((spin) => {
       const spunAt = new Date(spin?.spunAt || "");
       return (
@@ -425,10 +428,16 @@ export async function luckyDrawStatus(request, response, next) {
       ...featureSettings,
       manualDrawCompleted,
       hasWinnerForCurrentCycle,
+      drawCountYear,
+      drawCountsByMonth,
       lastSpin,
       entries: eligibleCustomers.map((customer, index) => ({
         id: String(index),
         name: customer.Name,
+        celebrationDate:
+          customer["Celebration date"] ||
+          customer["Date of birth"] ||
+          "",
       })),
     });
   } catch (error) {
@@ -524,6 +533,17 @@ export async function spinLuckyDraw(request, response, next) {
       return response.status(401).json({ message: "Admin access is required" });
     }
 
+    const celebrationMonth = Number(request.body?.celebrationMonth);
+    if (
+      !Number.isInteger(celebrationMonth) ||
+      celebrationMonth < 1 ||
+      celebrationMonth > 12
+    ) {
+      return response
+        .status(400)
+        .json({ message: "Choose a valid celebration month before spinning." });
+    }
+
     const isRespin = Boolean(request.body?.respin || request.body?.isRespin);
     const lockKey = getIndiaDrawCycle();
     const draw = await withLuckyDrawCycleLock(lockKey, async () => {
@@ -552,7 +572,7 @@ export async function spinLuckyDraw(request, response, next) {
         };
       }
 
-      let eligibleCustomers = getEligibleLuckyDrawCustomers(
+      const eligibleCustomers = getEligibleLuckyDrawCustomers(
         customers,
         winnerHistory,
         featureSettings.previousWinnerExclusionEnabled,
@@ -561,18 +581,12 @@ export async function spinLuckyDraw(request, response, next) {
           includeAllThisMonthEntries:
             featureSettings.includeAllThisMonthEntriesNextDraw,
           entriesMonth: featureSettings.includeAllThisMonthEntriesMonth,
+          celebrationMonth,
         },
       );
-      if (!eligibleCustomers.length && isRespin) {
-        eligibleCustomers = getEligibleLuckyDrawCustomers(
-          customers,
-          [],
-          false,
-        );
-      }
       if (!eligibleCustomers.length) {
         return {
-          error: "No eligible lucky draw entries are available",
+          error: "No eligible customers have a celebration in the selected month.",
           status: 400,
         };
       }

@@ -17,6 +17,14 @@ function getCustomerCelebrationMonth(customer) {
   return String(celebrationDate).match(/^\d{4}-\d{2}/)?.[0] || "";
 }
 
+function matchesCelebrationMonth(customer, month) {
+  if (!month) return true;
+  const celebrationDate =
+    customer["Celebration date"] || customer["Date of birth"] || "";
+  const customerMonth = String(celebrationDate).match(/^\d{4}-(\d{2})/)?.[1];
+  return Number(customerMonth) === month;
+}
+
 export function getEligibleLuckyDrawCustomers(
   customers,
   winnerHistory,
@@ -25,6 +33,7 @@ export function getEligibleLuckyDrawCustomers(
     includeAllEntries = false,
     includeAllThisMonthEntries = false,
     entriesMonth = "",
+    celebrationMonth = null,
   } = {},
 ) {
   const recentWinners =
@@ -54,7 +63,9 @@ export function getEligibleLuckyDrawCustomers(
         customersWithoutPhone.push(customer);
       }
     }
-    return [...latestCustomerByPhone.values(), ...customersWithoutPhone];
+    return [...latestCustomerByPhone.values(), ...customersWithoutPhone].filter(
+      (customer) => matchesCelebrationMonth(customer, celebrationMonth),
+    );
   }
 
   const latestCustomerByPhone = new Map();
@@ -71,8 +82,9 @@ export function getEligibleLuckyDrawCustomers(
 
   return eligibleEntries.filter(
     (customer) =>
-      !previousWinnerExclusionEnabled ||
-      includeAllEntries ||
-      !recentWinners.has(normalizePhone(customer.Phone || customer.phone)),
+      matchesCelebrationMonth(customer, celebrationMonth) &&
+      (!previousWinnerExclusionEnabled ||
+        includeAllEntries ||
+        !recentWinners.has(normalizePhone(customer.Phone || customer.phone))),
   );
 }
