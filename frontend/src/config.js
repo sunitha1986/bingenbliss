@@ -4,7 +4,7 @@ const config = {
     : window.location.origin,
 };
 
-//production build will use the same origin as the frontend, so we can just use window.location.origin
+// production build will use the same origin as the frontend, so we can just use window.location.origin
 // const config = {
 //   API_BASE_URL: "https://bingenbliss.vasmigroup.com/",
 // };
