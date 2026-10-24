@@ -1007,19 +1007,6 @@ function LandingPage() {
                 </div>
                 <div className="login-role-toggle" aria-label="Login type">
                   <button
-                    className={loginRole === "admin" ? "is-active" : ""}
-                    aria-pressed={loginRole === "admin"}
-                    onClick={() => {
-                      setLoginRole("admin");
-                      setCustomerLoginStep("phone");
-                      setCustomerOtp("");
-                      setFormError("");
-                    }}
-                    type="button"
-                  >
-                    Admin
-                  </button>
-                  <button
                     className={loginRole === "customer" ? "is-active" : ""}
                     aria-pressed={loginRole === "customer"}
                     onClick={() => {
@@ -1032,6 +1019,17 @@ function LandingPage() {
                     type="button"
                   >
                     Customer
+                  </button>
+                  <button
+                    className={loginRole === "admin" ? "is-active" : ""}
+                    aria-pressed={loginRole === "admin"}
+                    onClick={() => {
+                      setActiveModal(null);
+                      navigate("/admin");
+                    }}
+                    type="button"
+                  >
+                    Admin
                   </button>
                 </div>
                 <h2>
