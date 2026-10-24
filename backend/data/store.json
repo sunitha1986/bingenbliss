@@ -2,7 +2,7 @@
   "users": [],
   "orders": [],
   "luckyDrawSettings": {
-    "wheelEnabled": false,
+    "wheelEnabled": true,
     "annualEligibilityEnabled": true,
     "includeAllEntriesNextDraw": false,
     "includeAllThisMonthEntriesNextDraw": false,
@@ -10,28 +10,25 @@
     "celebrationOccasions": [
       "Birthday party",
       "Anniversary",
-      "Kitty party",
-      "Private theatre",
-      "Mini theatre",
-      "Photography",
-      "Customize lucky draw",
-      "Other"
+      "Private party"
     ],
     "previousWinnerExclusionEnabled": false,
     "manualDrawCompleted": true,
-    "isDrawing": true,
-    "drawingUntil": 1792152854201,
+    "isDrawing": false,
+    "drawingUntil": 0,
     "drawingWinner": {
-      "id": "11",
-      "Name": "Amyra S",
-      "Phone": "8553836367",
+      "id": "21",
+      "Name": "Sarada M",
+      "Phone": "9242342342",
       "Occasion": "Birthday party",
-      "Celebration date": "2026-11-19",
-      "Date of birth": "2026-11-19",
+      "Celebration date": "2026-10-21",
+      "Date of birth": "2026-10-21",
       "Guests": 2,
       "Consent": "Yes",
-      "Submitted at": "2026-10-01T10:41:46.492Z"
+      "Submitted at": "2026-10-09T21:49:29.569Z"
     },
-    "autoResetVisibilityAt": 1792152854201
+    "autoResetVisibilityAt": 0,
+    "nextDrawDate": "2026-10-23",
+    "drawDate": "2026-10-23"
   }
 }

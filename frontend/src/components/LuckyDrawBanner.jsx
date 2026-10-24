@@ -30,7 +30,7 @@ function LuckyDrawBanner({ banner }) {
                 </span>
                 <span className="banner-announcement-star" aria-hidden="true">✦</span>
                 <span>
-                  <strong>Next month&apos;s draw:</strong> {banner?.nextDrawDate || "Date to be announced"}
+                  <strong>Next draw date:</strong> {banner?.nextDrawDate || "Date to be announced"}
                 </span>
                 <span className="banner-announcement-star" aria-hidden="true">✦</span>
               </span>
@@ -41,7 +41,7 @@ function LuckyDrawBanner({ banner }) {
                 </span>
                 <span className="banner-announcement-star">✦</span>
                 <span>
-                  <strong>Next month&apos;s draw:</strong> {banner?.nextDrawDate || "Date to be announced"}
+                  <strong>Next draw date:</strong> {banner?.nextDrawDate || "Date to be announced"}
                 </span>
                 <span className="banner-announcement-star">✦</span>
               </span>

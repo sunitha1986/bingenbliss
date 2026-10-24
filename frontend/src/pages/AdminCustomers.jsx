@@ -6,6 +6,7 @@ import {
   updateAdminCustomer,
 } from "../services/api";
 import { createCustomerWorkbook } from "../utils/customerWorkbook.js";
+import logoImg from "../assets/landing_page/logo.jpg";
 import "../App.css";
 
 function getCurrentMonthValue() {
@@ -292,7 +293,7 @@ function AdminCustomers() {
     <main className="admin-shell">
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
-          <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
+          <img src={logoImg} alt="Binge N Bliss" />
           <span>BNB admin</span>
         </a>
         <nav className="admin-nav">
@@ -302,7 +303,9 @@ function AdminCustomers() {
             Customers
           </a>
           <a href="/admin/winner-history">Winner history</a>
-          <a href="/lucky-draw">Customer site</a>
+          <a href="/lucky-draw" target="_blank" rel="noopener noreferrer">
+            Customer site
+          </a>
         </nav>
         <button
           className="admin-signout"

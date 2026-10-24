@@ -12,6 +12,8 @@ import {
 } from "../services/api";
 import "../App.css";
 import "./LuckyDraw.css";
+import luckyDrawInfoImg from "../assets/lucky_draw_registration/lucky-draw-info.png";
+import winnerCardTemplateImg from "../assets/lucky_draw_registration/winner_card_template.png";
 
 const WINNER_CACHE_KEY = "bnb-lucky-draw-latest-winner";
 const DRAW_DATE_CACHE_KEY = "bnb-lucky-draw-draw-date";
@@ -198,11 +200,12 @@ function LuckyDraw() {
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showDuplicatePhonePopup, setShowDuplicatePhonePopup] = useState(false);
-  const [showWheel, setShowWheel] = useState(false);
+  const [customerWidgetEnabled, setCustomerWidgetEnabled] = useState(true);
   const [drawStatusError, setDrawStatusError] = useState("");
   const [isDrawing, setIsDrawing] = useState(false);
   const [showWheelOverlay, setShowWheelOverlay] = useState(false);
   const [luckyDrawWinner, setLuckyDrawWinner] = useState(() => getCachedWinner());
+  const [widgetWinner, setWidgetWinner] = useState(() => getCachedWinner());
   const [showWinnerPopup, setShowWinnerPopup] = useState(false);
   const phoneInputRef = useRef(null);
   const shouldFocusDuplicatePhoneRef = useRef(false);
@@ -246,7 +249,6 @@ function LuckyDraw() {
     }, 380);
   };
 
-  const isNamesBlinking = isDrawing;
   const drawMonthLabel = formatDrawMonth(drawDate);
 
   useEffect(() => {
@@ -256,12 +258,14 @@ function LuckyDraw() {
     getLuckyDrawLatestWinner()
       .then((latest) => {
         if (!isMounted) return;
+        if (isAnimatingSpinRef.current) return;
         const winnerObj = latest?.winner;
         const winnerName = latest?.lastWinnerName;
         if (winnerObj) {
           const formatted = formatLuckyDrawWinner(winnerObj);
           if (formatted) {
             setLuckyDrawWinner(formatted);
+            setWidgetWinner(formatted);
             saveWinnerToCache(formatted);
           }
         } else if (winnerName) {
@@ -274,12 +278,13 @@ function LuckyDraw() {
               date: "",
               occasion: "Special Celebration",
             };
+            setWidgetWinner(fallback);
             saveWinnerToCache(fallback);
             return fallback;
           });
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     const syncStatus = async () => {
       if (statusRequestInFlightRef.current) return;
@@ -310,9 +315,7 @@ function LuckyDraw() {
           };
         });
         const currentSpinId = status.lastSpin?.id || null;
-        if (!isAnimatingSpinRef.current) {
-          setShowWheel(Boolean(status.wheelEnabled || status.showWheel));
-        }
+        setCustomerWidgetEnabled(status.wheelEnabled !== false);
         setLuckyDrawEntries((currentEntries) => {
           const nextEntries = status.entries;
           const hasSameEntries =
@@ -328,28 +331,45 @@ function LuckyDraw() {
         if (!hasLoadedStatus.current) {
           hasLoadedStatus.current = true;
           lastSpinIdRef.current = currentSpinId;
-          if (status.lastSpin) {
-            completedWinnerSpinIdRef.current = currentSpinId;
-            const winnerEntry = formatLuckyDrawWinner(status.lastSpin.winner);
-            if (winnerEntry) {
-              setLuckyDrawWinner(winnerEntry);
-              saveWinnerToCache(winnerEntry, status.drawDate);
-            }
-          }
+          const winnerEntry = status.lastSpin
+            ? formatLuckyDrawWinner(status.lastSpin.winner)
+            : null;
+
           if (status.isDrawing && !isAnimatingSpinRef.current) {
             isAnimatingSpinRef.current = true;
             setIsDrawing(true);
-            setShowWheel(true);
-            setShowWheelOverlay(true);
+            setShowWheelOverlay(false);
+            const activeWinner = formatLuckyDrawWinner(
+              status.drawingWinner || status.lastSpin?.winner,
+            );
+            if (activeWinner) {
+              setLuckyDrawWinner(activeWinner);
+            }
+            window.setTimeout(() => {
+              if (isMounted) {
+                setShowWheelOverlay(true);
+              }
+            }, 2500);
             window.setTimeout(() => {
               if (isMounted) {
                 setIsDrawing(false);
                 setShowWheelOverlay(false);
-                setShowWheel(false);
                 setShowWinnerPopup(true);
                 isAnimatingSpinRef.current = false;
+                if (activeWinner) {
+                  setWidgetWinner(activeWinner);
+                  saveWinnerToCache(activeWinner, status.drawDate);
+                }
               }
-            }, 7000);
+            }, 9000);
+            return;
+          }
+
+          if (winnerEntry) {
+            completedWinnerSpinIdRef.current = currentSpinId;
+            setLuckyDrawWinner(winnerEntry);
+            setWidgetWinner(winnerEntry);
+            saveWinnerToCache(winnerEntry, status.drawDate);
           }
           return;
         }
@@ -357,7 +377,7 @@ function LuckyDraw() {
         // Live draw animation triggered when admin spins or a new spin is detected
         const isSpinActive = Boolean(
           status.isDrawing ||
-          (currentSpinId && currentSpinId !== lastSpinIdRef.current)
+          (currentSpinId && currentSpinId !== lastSpinIdRef.current),
         );
 
         if (isSpinActive && !isAnimatingSpinRef.current) {
@@ -368,11 +388,9 @@ function LuckyDraw() {
           if (winnerEntry) {
             completedWinnerSpinIdRef.current = currentSpinId;
             setLuckyDrawWinner(winnerEntry);
-            saveWinnerToCache(winnerEntry, status.drawDate);
           }
 
           setIsDrawing(true);
-          setShowWheel(true);
           setShowWheelOverlay(false);
           setShowWinnerPopup(false);
 
@@ -388,9 +406,12 @@ function LuckyDraw() {
             if (isMounted) {
               setIsDrawing(false);
               setShowWheelOverlay(false);
-              setShowWheel(false);
               setShowWinnerPopup(true);
               isAnimatingSpinRef.current = false;
+              if (winnerEntry) {
+                setWidgetWinner(winnerEntry);
+                saveWinnerToCache(winnerEntry, status.drawDate);
+              }
             }
           }, 9000);
         }
@@ -725,506 +746,440 @@ function LuckyDraw() {
             {drawStatusError}
           </p>
         )}
-        {/* Show live draw entries when wheel is active. */}
-        {(showWheel || isDrawing) && (
+        {/* Floating Left-Edge Winner Widget when winner exists */}
+        {Boolean(widgetWinner) && customerWidgetEnabled && !isDrawing && !showWheelOverlay && (
           <div
-            className="lucky-draw-layout"
-            style={{
-              marginBottom: "36px",
-              gridTemplateColumns: "minmax(0, 1fr)",
+            className="floating-winner-widget"
+            onClick={() => setShowWinnerPopup(true)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setShowWinnerPopup(true);
             }}
+            aria-label="View winner poster"
           >
-            <div className="lucky-draw-wheel-panel">
-              <div className="lucky-draw-reveal-panel">
-                <span className="draw-reveal-kicker">
-                  Live Draw Entries
-                  {drawMonthLabel ? ` · ${drawMonthLabel}` : ""}
+            <div className="winner-widget-header">
+              <span className="winner-widget-badge">
+                👑 MONTHLY WINNER{drawMonthLabel ? ` · ${drawMonthLabel}` : ""}
+              </span>
+              <span className="widget-sparkle-icon">🎉</span>
+            </div>
+
+            <div className="winner-widget-body">
+              <div className="winner-name-badge-wrapper">
+                <span className="winner-name-glowing-pill">
+                  {widgetWinner.name}
                 </span>
-                <strong className={isNamesBlinking ? "is-drawing" : ""}>
-                  {isNamesBlinking
-                    ? "And the winner is..."
-                    : luckyDrawWinner
-                      ? `Winner: ${luckyDrawWinner.name}`
-                      : "Ready when you are"}
-                </strong>
-                <div
-                  className="name-capsule-grid"
-                  aria-label="Lucky draw customers"
-                  ref={entryListRef}
-                >
-                  {luckyDrawEntries.slice(0, visibleEntryCount).map((entry, index) => {
-                    const isWinner =
-                      !isNamesBlinking &&
-                      luckyDrawWinner?.name === entry.name;
-                    return (
-                      <span
-                        className={[
-                          "name-capsule",
-                          isWinner ? "is-winner" : "",
-                          isNamesBlinking ? "is-blinking" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        key={entry.id}
-                        style={{ animationDelay: `${(index * 83) % 900}ms` }}
-                      >
-                        {entry.name}
-                      </span>
-                    );
-                  })}
-                  {hasMoreEntries && (
-                    <span
-                      aria-hidden="true"
-                      className="scroll-load-sentinel"
-                      ref={entryListSentinelRef}
-                    />
-                  )}
-                </div>
-                <small>
-                  Showing {Math.min(visibleEntryCount, luckyDrawEntries.length)} of{" "}
-                  {luckyDrawEntries.length} entries in this month&apos;s draw
-                </small>
               </div>
+              <button
+                className="view-poster-glowing-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowWinnerPopup(true);
+                }}
+                type="button"
+              >
+                <span className="poster-label-full">View Winner Poster</span>
+                <span className="poster-label-compact">Poster</span>
+                <span className="btn-sparkle">✨ ↗</span>
+              </button>
             </div>
           </div>
         )}
 
-        {/* Floating Left-Edge Winner Widget when winner exists */}
-        {Boolean(luckyDrawWinner) && (
-            <div
-              className="floating-winner-widget"
-              onClick={() => setShowWinnerPopup(true)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") setShowWinnerPopup(true);
-              }}
-              aria-label="View winner poster"
-            >
-              <div className="winner-widget-header">
-                <span className="winner-widget-badge">
-                  👑 MONTHLY WINNER{drawMonthLabel ? ` · ${drawMonthLabel}` : ""}
-                </span>
-                <span className="widget-sparkle-icon">🎉</span>
-              </div>
-
-              <div className="winner-widget-body">
-                <div className="winner-name-badge-wrapper">
-                  <span className="winner-name-glowing-pill">
-                    {luckyDrawWinner.name}
-                  </span>
-                </div>
-                <button
-                  className="view-poster-glowing-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowWinnerPopup(true);
-                  }}
-                  type="button"
-                >
-                  <span className="poster-label-full">View Winner Poster</span>
-                  <span className="poster-label-compact">Poster</span>
-                  <span className="btn-sparkle">✨ ↗</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-        {/* Registration Form Wrapper */}
-        {!showWheel && !isDrawing && (
-          <div className="lucky-draw-card-wrapper">
-            <img
-              className="registration-form-mascot"
-              src="/lucky_draw_registration/lucky-draw-info.png"
-              alt="For next month's winner"
-            />
-            <form
-              className="registration-card-form"
-              onSubmit={handleLuckyDrawSubmit}
-              noValidate
-            >
-              {/* Full Name */}
-              <div className="reg-field">
-                <label htmlFor="lucky-draw-name">FULL NAME</label>
-                <div className="reg-input-group">
-                  <span className="reg-icon-badge badge-pink">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="15"
-                      height="15"
-                      fill="currentColor"
-                    >
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                    </svg>
-                  </span>
-                  <input
-                    id="lucky-draw-name"
-                    type="text"
-                    value={luckyDrawForm.name}
-                    aria-invalid={
-                      hasAttemptedSubmit && Boolean(validationErrors.name)
-                    }
-                    aria-describedby={
-                      hasAttemptedSubmit && validationErrors.name
-                        ? "lucky-draw-name-error"
-                        : undefined
-                    }
-                    className={
-                      hasAttemptedSubmit && validationErrors.name
-                        ? "is-invalid"
-                        : ""
-                    }
-                    onChange={(event) =>
-                      updateLuckyDrawField("name", event.target.value)
-                    }
-                    placeholder="Your full name"
-                    required
-                  />
-                </div>
-                {hasAttemptedSubmit && validationErrors.name && (
-                  <p className="field-error-text" id="lucky-draw-name-error">
-                    {validationErrors.name}
-                  </p>
-                )}
-              </div>
-
-              {/* WhatsApp Number */}
-              <div className="reg-field">
-                <label htmlFor="lucky-draw-phone">WHATSAPP NUMBER</label>
-                <div className="reg-input-group">
-                  <span className="reg-icon-badge badge-green">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="15"
-                      height="15"
-                      fill="currentColor"
-                    >
-                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
-                    </svg>
-                  </span>
-                  <input
-                    id="lucky-draw-phone"
-                    ref={phoneInputRef}
-                    type="tel"
-                    pattern="[0-9]{10}"
-                    inputMode="numeric"
-                    maxLength={10}
-                    value={luckyDrawForm.phone}
-                    aria-invalid={
-                      Boolean(phoneError) ||
-                      (hasAttemptedSubmit && Boolean(validationErrors.phone))
-                    }
-                    aria-describedby={
-                      phoneError || (hasAttemptedSubmit && validationErrors.phone)
-                        ? "lucky-draw-phone-error"
-                        : undefined
-                    }
-                    onChange={(event) =>
-                      updateLuckyDrawField(
-                        "phone",
-                        event.target.value.replace(/\D/g, "").slice(0, 10),
-                      )
-                    }
-                    placeholder="10-digit WhatsApp number"
-                    className={[
-                      isPhoneVerified
-                        ? "has-verified-badge"
-                        : "has-verify-btn",
-                      hasAttemptedSubmit && validationErrors.phone
-                        || phoneError
-                        ? "is-invalid"
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    required
-                  />
-                  {isPhoneVerified ? (
-                    <span className="phone-verified-badge">✓ Verified</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className={`verify-num-btn${luckyDrawForm.phone.length === 10 ? " is-ready" : ""}`}
-                      onClick={handleSendOtp}
-                    >
-                      <span className="verify-button-desktop-label">
-                        Verify Number
-                      </span>
-                      <span className="verify-button-mobile-label">Verify</span>
-                    </button>
-                  )}
-                </div>
-                {(phoneError ||
-                  (hasAttemptedSubmit && validationErrors.phone)) && (
-                    <p
-                      className="field-error-text"
-                      id="lucky-draw-phone-error"
-                    >
-                      {phoneError || validationErrors.phone}
-                    </p>
-                  )}
-                {isVerifyingPhone && !isPhoneVerified && (
-                  <div className="otp-verification-box">
-                    <p className="otp-label">
-                      Enter the test verification code 7374:
-                    </p>
-                    <div className="otp-input-row">
-                      <input
-                        type="text"
-                        maxLength={4}
-                        value={enteredCode}
-                        onChange={(e) =>
-                          setEnteredCode(e.target.value.replace(/\D/g, ""))
-                        }
-                        placeholder="4-digit code"
-                        className="otp-code-input"
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        className="confirm-otp-btn"
-                        onClick={handleVerifyOtp}
-                      >
-                        Confirm Code
-                      </button>
-                    </div>
-                    {otpError && <p className="otp-error">{otpError}</p>}
-                    <button
-                      type="button"
-                      className="resend-otp-btn"
-                      onClick={handleSendOtp}
-                    >
-                      Use test code 7374
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Special Occasion */}
-              <div className="reg-field">
-                <label htmlFor="lucky-draw-occasion">SPECIAL OCCASION</label>
-                <div className="reg-input-group">
-                  <span className="reg-icon-badge badge-purple">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="15"
-                      height="15"
-                      fill="currentColor"
-                    >
-                      <path d="M20 6h-3.18c.09-.32.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.67C9.96 2.54 9.05 2 8 2 6.34 2 5 3.34 5 5c0 .35.09.68.18 1H2v4h20V6zm-9-1c0-.55.45-1 1-1s1 .45 1 1-.45 1-1 1h-1V5zM7 5c0-.55.45-1 1-1s1 .45 1 1v1H8c-.55 0-1-.45-1-1zM3 20c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V11H3v9zm11-7h3v2h-3v-2z" />
-                    </svg>
-                  </span>
-                  <select
-                    id="lucky-draw-occasion"
-                    value={luckyDrawForm.occasion}
-                    disabled={!celebrationOccasions.length}
-                    aria-invalid={
-                      hasAttemptedSubmit && Boolean(validationErrors.occasion)
-                    }
-                    aria-describedby={
-                      hasAttemptedSubmit && validationErrors.occasion
-                        ? "lucky-draw-occasion-error"
-                        : undefined
-                    }
-                    className={
-                      hasAttemptedSubmit && validationErrors.occasion
-                        ? "is-invalid"
-                        : ""
-                    }
-                    onChange={(event) =>
-                      updateLuckyDrawField("occasion", event.target.value)
-                    }
-                    required
-                  >
-                    {!celebrationOccasions.length && (
-                      <option value="">Loading occasions...</option>
-                    )}
-                    {celebrationOccasions.map((occasion) => (
-                      <option key={occasion} value={occasion}>
-                        {occasion}
-                      </option>
-                    ))}
-                  </select>
+        {/* Registration Form Wrapper - ALWAYS SHOWN */}
+        <div className="lucky-draw-card-wrapper">
+          <img
+            className="registration-form-mascot"
+            src={luckyDrawInfoImg}
+            alt="For next month's winner"
+          />
+          <form
+            className="registration-card-form"
+            onSubmit={handleLuckyDrawSubmit}
+            noValidate
+          >
+            {/* Full Name */}
+            <div className="reg-field">
+              <label htmlFor="lucky-draw-name">FULL NAME</label>
+              <div className="reg-input-group">
+                <span className="reg-icon-badge badge-pink">
                   <svg
-                    className="select-dropdown-arrow"
                     viewBox="0 0 24 24"
-                    aria-hidden="true"
+                    width="15"
+                    height="15"
+                    fill="currentColor"
                   >
-                    <path d="m6 9 6 6 6-6" />
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                   </svg>
-                </div>
-                {hasAttemptedSubmit && validationErrors.occasion && (
-                  <p
-                    className="field-error-text"
-                    id="lucky-draw-occasion-error"
-                  >
-                    {validationErrors.occasion}
-                  </p>
-                )}
-              </div>
-
-              {/* Celebration Date */}
-              <div className="reg-field">
-                <label htmlFor="lucky-draw-date">CELEBRATION DATE</label>
-                <div className="reg-input-group">
-                  <span className="reg-icon-badge badge-indigo">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="15"
-                      height="15"
-                      fill="currentColor"
-                    >
-                      <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z" />
-                    </svg>
-                  </span>
-                  <input
-                    id="lucky-draw-date"
-                    type="date"
-                    min={getMinimumCelebrationDate()}
-                    value={luckyDrawForm.date}
-                    aria-invalid={
-                      hasAttemptedSubmit && Boolean(validationErrors.date)
-                    }
-                    aria-describedby={
-                      hasAttemptedSubmit && validationErrors.date
-                        ? "lucky-draw-date-error"
-                        : undefined
-                    }
-                    className={
-                      hasAttemptedSubmit && validationErrors.date
-                        ? "is-invalid"
-                        : ""
-                    }
-                    onChange={(event) =>
-                      updateLuckyDrawField("date", event.target.value)
-                    }
-                    placeholder="dd - mm - yyyy"
-                    required
-                  />
-                </div>
-                {hasAttemptedSubmit && validationErrors.date && (
-                  <p className="field-error-text" id="lucky-draw-date-error">
-                    {validationErrors.date}
-                  </p>
-                )}
-              </div>
-
-              {/* Expected Guests */}
-              <div className="reg-field">
-                <label htmlFor="lucky-draw-guests">EXPECTED GUESTS</label>
-                <div className="reg-input-group">
-                  <span className="reg-icon-badge badge-purple">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="15"
-                      height="15"
-                      fill="currentColor"
-                    >
-                      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
-                    </svg>
-                  </span>
-                  <input
-                    id="lucky-draw-guests"
-                    type="number"
-                    min="1"
-                    value={luckyDrawForm.guests}
-                    aria-invalid={
-                      hasAttemptedSubmit && Boolean(validationErrors.guests)
-                    }
-                    aria-describedby={
-                      hasAttemptedSubmit && validationErrors.guests
-                        ? "lucky-draw-guests-error"
-                        : undefined
-                    }
-                    className={
-                      hasAttemptedSubmit && validationErrors.guests
-                        ? "is-invalid"
-                        : ""
-                    }
-                    onChange={(event) =>
-                      updateLuckyDrawField("guests", event.target.value)
-                    }
-                    placeholder="2"
-                    required
-                  />
-                </div>
-                {hasAttemptedSubmit && validationErrors.guests && (
-                  <p
-                    className="field-error-text"
-                    id="lucky-draw-guests-error"
-                  >
-                    {validationErrors.guests}
-                  </p>
-                )}
-              </div>
-
-              {/* Consent Checkbox */}
-              <div className="reg-consent-group">
+                </span>
                 <input
-                  id="lucky-draw-consent"
-                  type="checkbox"
-                  checked={luckyDrawForm.consent}
+                  id="lucky-draw-name"
+                  type="text"
+                  value={luckyDrawForm.name}
+                  aria-invalid={
+                    hasAttemptedSubmit && Boolean(validationErrors.name)
+                  }
+                  aria-describedby={
+                    hasAttemptedSubmit && validationErrors.name
+                      ? "lucky-draw-name-error"
+                      : undefined
+                  }
                   className={
-                    hasAttemptedSubmit && validationErrors.consent
+                    hasAttemptedSubmit && validationErrors.name
                       ? "is-invalid"
                       : ""
                   }
+                  onChange={(event) =>
+                    updateLuckyDrawField("name", event.target.value)
+                  }
+                  placeholder="Your full name"
+                  required
+                />
+              </div>
+              {hasAttemptedSubmit && validationErrors.name && (
+                <p className="field-error-text" id="lucky-draw-name-error">
+                  {validationErrors.name}
+                </p>
+              )}
+            </div>
+
+            {/* WhatsApp Number */}
+            <div className="reg-field">
+              <label htmlFor="lucky-draw-phone">WHATSAPP NUMBER</label>
+              <div className="reg-input-group">
+                <span className="reg-icon-badge badge-green">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="15"
+                    height="15"
+                    fill="currentColor"
+                  >
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
+                  </svg>
+                </span>
+                <input
+                  id="lucky-draw-phone"
+                  ref={phoneInputRef}
+                  type="tel"
+                  pattern="[0-9]{10}"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={luckyDrawForm.phone}
                   aria-invalid={
-                    hasAttemptedSubmit && Boolean(validationErrors.consent)
+                    Boolean(phoneError) ||
+                    (hasAttemptedSubmit && Boolean(validationErrors.phone))
                   }
                   aria-describedby={
-                    hasAttemptedSubmit && validationErrors.consent
-                      ? "lucky-draw-consent-error"
+                    phoneError || (hasAttemptedSubmit && validationErrors.phone)
+                      ? "lucky-draw-phone-error"
                       : undefined
                   }
                   onChange={(event) =>
-                    updateLuckyDrawField("consent", event.target.checked)
+                    updateLuckyDrawField(
+                      "phone",
+                      event.target.value.replace(/\D/g, "").slice(0, 10),
+                    )
                   }
+                  placeholder="10-digit WhatsApp number"
+                  className={[
+                    isPhoneVerified
+                      ? "has-verified-badge"
+                      : "has-verify-btn",
+                    hasAttemptedSubmit && validationErrors.phone
+                      || phoneError
+                      ? "is-invalid"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   required
                 />
-                <label htmlFor="lucky-draw-consent">
-                  I AGREE TO RECEIVE BINGE AND BLISS CELEBRATION REMINDERS,
-                  BOOKING INFORMATION AND PROMOTIONAL OFFERS ON WHATSAPP.
-                </label>
+                {isPhoneVerified ? (
+                  <span className="phone-verified-badge">✓ Verified</span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`verify-num-btn${luckyDrawForm.phone.length === 10 ? " is-ready" : ""}`}
+                    onClick={handleSendOtp}
+                  >
+                    <span className="verify-button-desktop-label">
+                      Verify Number
+                    </span>
+                    <span className="verify-button-mobile-label">Verify</span>
+                  </button>
+                )}
               </div>
-              {hasAttemptedSubmit && validationErrors.consent && (
-                <p
-                  className="field-error-text consent-error"
-                  id="lucky-draw-consent-error"
-                >
-                  {validationErrors.consent}
-                </p>
+              {(phoneError ||
+                (hasAttemptedSubmit && validationErrors.phone)) && (
+                  <p
+                    className="field-error-text"
+                    id="lucky-draw-phone-error"
+                  >
+                    {phoneError || validationErrors.phone}
+                  </p>
+                )}
+              {isVerifyingPhone && !isPhoneVerified && (
+                <div className="otp-verification-box">
+                  <p className="otp-label">
+                    Enter the test verification code 7374:
+                  </p>
+                  <div className="otp-input-row">
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={enteredCode}
+                      onChange={(e) =>
+                        setEnteredCode(e.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder="4-digit code"
+                      className="otp-code-input"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="confirm-otp-btn"
+                      onClick={handleVerifyOtp}
+                    >
+                      Confirm Code
+                    </button>
+                  </div>
+                  {otpError && <p className="otp-error">{otpError}</p>}
+                  <button
+                    type="button"
+                    className="resend-otp-btn"
+                    onClick={handleSendOtp}
+                  >
+                    Use test code 7374
+                  </button>
+                </div>
               )}
+            </div>
 
-              {/* CTA Button */}
-              <button
-                className="reg-submit-btn"
-                type="submit"
-                disabled={isSubmitting}
-              >
-                <span>
-                  {isSubmitting
-                    ? "Registering..."
-                    : "Register and Enter the Draw"}
+            {/* Special Occasion */}
+            <div className="reg-field">
+              <label htmlFor="lucky-draw-occasion">SPECIAL OCCASION</label>
+              <div className="reg-input-group">
+                <span className="reg-icon-badge badge-purple">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="15"
+                    height="15"
+                    fill="currentColor"
+                  >
+                    <path d="M20 6h-3.18c.09-.32.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.67C9.96 2.54 9.05 2 8 2 6.34 2 5 3.34 5 5c0 .35.09.68.18 1H2v4h20V6zm-9-1c0-.55.45-1 1-1s1 .45 1 1-.45 1-1 1h-1V5zM7 5c0-.55.45-1 1-1s1 .45 1 1v1H8c-.55 0-1-.45-1-1zM3 20c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V11H3v9zm11-7h3v2h-3v-2z" />
+                  </svg>
                 </span>
-                <span className="btn-arrow">→</span>
-              </button>
-              {submitError && (
-                <p
-                  className="form-error"
-                  role="alert"
-                  style={{
-                    textAlign: "center",
-                    color: "#e11d48",
-                    marginTop: "12px",
-                  }}
+                <select
+                  id="lucky-draw-occasion"
+                  value={luckyDrawForm.occasion}
+                  disabled={!celebrationOccasions.length}
+                  aria-invalid={
+                    hasAttemptedSubmit && Boolean(validationErrors.occasion)
+                  }
+                  aria-describedby={
+                    hasAttemptedSubmit && validationErrors.occasion
+                      ? "lucky-draw-occasion-error"
+                      : undefined
+                  }
+                  className={
+                    hasAttemptedSubmit && validationErrors.occasion
+                      ? "is-invalid"
+                      : ""
+                  }
+                  onChange={(event) =>
+                    updateLuckyDrawField("occasion", event.target.value)
+                  }
+                  required
                 >
-                  {submitError}
+                  {!celebrationOccasions.length && (
+                    <option value="">Loading occasions...</option>
+                  )}
+                  {celebrationOccasions.map((occasion) => (
+                    <option key={occasion} value={occasion}>
+                      {occasion}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  className="select-dropdown-arrow"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
+              {hasAttemptedSubmit && validationErrors.occasion && (
+                <p
+                  className="field-error-text"
+                  id="lucky-draw-occasion-error"
+                >
+                  {validationErrors.occasion}
                 </p>
               )}
-            </form>
-          </div>
-        )}
+            </div>
+
+            {/* Celebration Date */}
+            <div className="reg-field">
+              <label htmlFor="lucky-draw-date">CELEBRATION DATE</label>
+              <div className="reg-input-group">
+                <span className="reg-icon-badge badge-indigo">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="15"
+                    height="15"
+                    fill="currentColor"
+                  >
+                    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z" />
+                  </svg>
+                </span>
+                <input
+                  id="lucky-draw-date"
+                  type="date"
+                  min={getMinimumCelebrationDate()}
+                  value={luckyDrawForm.date}
+                  aria-invalid={
+                    hasAttemptedSubmit && Boolean(validationErrors.date)
+                  }
+                  aria-describedby={
+                    hasAttemptedSubmit && validationErrors.date
+                      ? "lucky-draw-date-error"
+                      : undefined
+                  }
+                  className={
+                    hasAttemptedSubmit && validationErrors.date
+                      ? "is-invalid"
+                      : ""
+                  }
+                  onChange={(event) =>
+                    updateLuckyDrawField("date", event.target.value)
+                  }
+                  placeholder="dd - mm - yyyy"
+                  required
+                />
+              </div>
+              {hasAttemptedSubmit && validationErrors.date && (
+                <p className="field-error-text" id="lucky-draw-date-error">
+                  {validationErrors.date}
+                </p>
+              )}
+            </div>
+
+            {/* Expected Guests */}
+            <div className="reg-field">
+              <label htmlFor="lucky-draw-guests">EXPECTED GUESTS</label>
+              <div className="reg-input-group">
+                <span className="reg-icon-badge badge-purple">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="15"
+                    height="15"
+                    fill="currentColor"
+                  >
+                    <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                  </svg>
+                </span>
+                <input
+                  id="lucky-draw-guests"
+                  type="number"
+                  min="1"
+                  value={luckyDrawForm.guests}
+                  aria-invalid={
+                    hasAttemptedSubmit && Boolean(validationErrors.guests)
+                  }
+                  aria-describedby={
+                    hasAttemptedSubmit && validationErrors.guests
+                      ? "lucky-draw-guests-error"
+                      : undefined
+                  }
+                  className={
+                    hasAttemptedSubmit && validationErrors.guests
+                      ? "is-invalid"
+                      : ""
+                  }
+                  onChange={(event) =>
+                    updateLuckyDrawField("guests", event.target.value)
+                  }
+                  placeholder="2"
+                  required
+                />
+              </div>
+              {hasAttemptedSubmit && validationErrors.guests && (
+                <p
+                  className="field-error-text"
+                  id="lucky-draw-guests-error"
+                >
+                  {validationErrors.guests}
+                </p>
+              )}
+            </div>
+
+            {/* Consent Checkbox */}
+            <div className="reg-consent-group">
+              <input
+                id="lucky-draw-consent"
+                type="checkbox"
+                checked={luckyDrawForm.consent}
+                className={
+                  hasAttemptedSubmit && validationErrors.consent
+                    ? "is-invalid"
+                    : ""
+                }
+                aria-invalid={
+                  hasAttemptedSubmit && Boolean(validationErrors.consent)
+                }
+                aria-describedby={
+                  hasAttemptedSubmit && validationErrors.consent
+                    ? "lucky-draw-consent-error"
+                    : undefined
+                }
+                onChange={(event) =>
+                  updateLuckyDrawField("consent", event.target.checked)
+                }
+                required
+              />
+              <label htmlFor="lucky-draw-consent">
+                I AGREE TO RECEIVE BINGE AND BLISS CELEBRATION REMINDERS,
+                BOOKING INFORMATION AND PROMOTIONAL OFFERS ON WHATSAPP.
+              </label>
+            </div>
+            {hasAttemptedSubmit && validationErrors.consent && (
+              <p
+                className="field-error-text consent-error"
+                id="lucky-draw-consent-error"
+              >
+                {validationErrors.consent}
+              </p>
+            )}
+
+            {/* CTA Button */}
+            <button
+              className="reg-submit-btn"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              <span>
+                {isSubmitting
+                  ? "Registering..."
+                  : "Register and Enter the Draw"}
+              </span>
+              <span className="btn-arrow">→</span>
+            </button>
+            {submitError && (
+              <p
+                className="form-error"
+                role="alert"
+                style={{
+                  textAlign: "center",
+                  color: "#e11d48",
+                  marginTop: "12px",
+                }}
+              >
+                {submitError}
+              </p>
+            )}
+          </form>
+        </div>
       </section>
       <Footer standalone />
 
@@ -1562,6 +1517,53 @@ function LuckyDraw() {
         </div>
       )}
 
+      {/* Live Draw Naming Capsule Overlay during spin */}
+      {isDrawing && !showWheelOverlay && (
+        <div
+          className="modal-backdrop naming-capsule-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="naming-capsule-modal-title"
+        >
+          <div className="modal-card naming-capsule-modal-card">
+            <div className="lucky-draw-reveal-panel">
+              <span className="draw-reveal-kicker">
+                Live Draw Entries
+                {drawMonthLabel ? ` · ${drawMonthLabel}` : ""}
+              </span>
+              <strong id="naming-capsule-modal-title" className="is-drawing">
+                And the winner is...
+              </strong>
+              <div
+                className="name-capsule-grid"
+                aria-label="Lucky draw customers"
+                ref={entryListRef}
+              >
+                {luckyDrawEntries.slice(0, visibleEntryCount).map((entry, index) => (
+                  <span
+                    className="name-capsule is-blinking"
+                    key={entry.id}
+                    style={{ animationDelay: `${(index * 83) % 900}ms` }}
+                  >
+                    {entry.name}
+                  </span>
+                ))}
+                {hasMoreEntries && (
+                  <span
+                    aria-hidden="true"
+                    className="scroll-load-sentinel"
+                    ref={entryListSentinelRef}
+                  />
+                )}
+              </div>
+              <small>
+                Selecting from {luckyDrawEntries.length} entries in this month&apos;s draw
+              </small>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Full Screen Spinning Wheel Overlay Blocking Screen */}
       {showWheelOverlay && (
         <div
@@ -1712,7 +1714,7 @@ function LuckyDraw() {
             {/* Poster Graphic with Text Overlays */}
             <div className="template-poster-wrapper">
               <img
-                src="/lucky_draw_registration/winner_card_template.png"
+                src={winnerCardTemplateImg}
                 alt="Winner Announcement Template"
                 className="template-poster-img"
               />

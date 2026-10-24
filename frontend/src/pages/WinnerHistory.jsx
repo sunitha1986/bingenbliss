@@ -3,6 +3,7 @@ import { useScrollLoadedCount } from "../hooks/useScrollLoadedCount";
 import { getLuckyDrawStatus, getLuckyDrawWinners } from "../services/api";
 import "../App.css";
 import "./WinnerHistory.css";
+import logoImg from "../assets/landing_page/logo.jpg";
 
 function formatAnnouncementDate(value) {
   const date = new Date(value);
@@ -170,7 +171,7 @@ function WinnerHistory() {
           href="/"
           aria-label="Binge N Bliss admin home"
         >
-          <img src="/landing_page/logo.jpg" alt="" />
+          <img src={logoImg} alt="" />
           <span>BNB admin</span>
         </a>
         <nav className="winner-history-admin-nav">
@@ -184,7 +185,9 @@ function WinnerHistory() {
           >
             Winner history
           </a>
-          <a href="/lucky-draw">Customer site</a>
+          <a href="/lucky-draw" target="_blank" rel="noopener noreferrer">
+            Customer site
+          </a>
         </nav>
         <button
           className="winner-history-admin-signout"

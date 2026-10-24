@@ -23,6 +23,7 @@ import {
   recordLuckyDrawSpin,
   saveOrder,
   setLuckyDrawCelebrationOccasions,
+  setLuckyDrawNextDrawDate,
   setLuckyDrawIncludeAllEntriesNextDraw as saveIncludeAllEntriesNextDraw,
   setLuckyDrawIncludeAllThisMonthEntriesNextDraw as saveIncludeAllThisMonthEntriesNextDraw,
   setLuckyDrawFeatureSettings,
@@ -447,11 +448,26 @@ export async function luckyDrawStatus(request, response, next) {
 
 export async function luckyDrawLatestWinner(request, response, next) {
   try {
-    const [wheelEnabled, winnerHistory] = await Promise.all([
+    const [wheelEnabled, winnerHistory, spinningState] = await Promise.all([
       getLuckyDrawWheelEnabled(),
       getLuckyDrawWinnerHistory(),
+      getLuckyDrawSpinningState(),
     ]);
-    const latestWinner = winnerHistory
+    const completedWinnerHistory =
+      spinningState.isDrawing && spinningState.drawingWinner
+        ? winnerHistory.filter((spin) => {
+            const w = spin?.winner;
+            const dw = spinningState.drawingWinner;
+            if (!w || !dw) return true;
+            return !(
+              (w.id && dw.id && String(w.id) === String(dw.id)) ||
+              ((w.Phone || w.phone) &&
+                (dw.Phone || dw.phone) &&
+                (w.Phone || w.phone) === (dw.Phone || dw.phone))
+            );
+          })
+        : winnerHistory;
+    const latestWinner = completedWinnerHistory
       .filter(
         (spin) =>
           spin?.winner && Number.isFinite(Date.parse(spin.spunAt || "")),
@@ -464,8 +480,12 @@ export async function luckyDrawLatestWinner(request, response, next) {
       ? new Date(latestWinner.spunAt)
       : null;
 
+    const featureSettings = await getLuckyDrawFeatureSettings();
+
     return response.json({
       wheelEnabled,
+      nextDrawDate: featureSettings.nextDrawDate || "",
+      drawDate: featureSettings.nextDrawDate || "",
       winner: latestWinner?.winner || null,
       lastWinnerName:
         latestWinner?.winner?.Name ||
@@ -777,6 +797,20 @@ export async function updateLuckyDrawOccasions(request, response, next) {
     const celebrationOccasions =
       await setLuckyDrawCelebrationOccasions(normalizedOccasions);
     return response.json({ celebrationOccasions });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function updateLuckyDrawNextDrawDate(request, response, next) {
+  try {
+    if (!isAdminToken(request.get("authorization")?.replace("Bearer ", ""))) {
+      return response.status(401).json({ message: "Admin access is required" });
+    }
+
+    const { nextDrawDate } = request.body || {};
+    const updated = await setLuckyDrawNextDrawDate(nextDrawDate);
+    return response.json({ nextDrawDate: updated, drawDate: updated });
   } catch (error) {
     return next(error);
   }

@@ -18,6 +18,7 @@ import {
   spinLuckyDraw,
   updateLuckyDrawFeatures,
   updateLuckyDrawOccasions,
+  updateLuckyDrawNextDrawDate,
   updateLuckyDrawCustomer,
   validateCoupon,
   verifyCustomerLogin,
@@ -43,7 +44,14 @@ router.post(
   setLuckyDrawIncludeAllThisMonthEntriesNextDraw,
 );
 router.patch("/admin/lucky-draw/features", updateLuckyDrawFeatures);
+router.put("/admin/lucky-draw/features", updateLuckyDrawFeatures);
+router.post("/admin/lucky-draw/features", updateLuckyDrawFeatures);
 router.patch("/admin/lucky-draw/occasions", updateLuckyDrawOccasions);
+router.put("/admin/lucky-draw/occasions", updateLuckyDrawOccasions);
+router.post("/admin/lucky-draw/occasions", updateLuckyDrawOccasions);
+router.patch("/admin/lucky-draw/next-draw-date", updateLuckyDrawNextDrawDate);
+router.put("/admin/lucky-draw/next-draw-date", updateLuckyDrawNextDrawDate);
+router.post("/admin/lucky-draw/next-draw-date", updateLuckyDrawNextDrawDate);
 router.get("/admin/customers", listLuckyDrawCustomers);
 router.put("/admin/customers/:customerId", updateLuckyDrawCustomer);
 router.delete("/admin/customers/:customerId", deleteLuckyDrawCustomer);

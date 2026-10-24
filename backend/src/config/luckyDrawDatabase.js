@@ -14,6 +14,8 @@ const pool = mysql.createPool({
   dateStrings: true,
   supportBigNumbers: true,
   bigNumberStrings: true,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
 });
 
 let initialization;
@@ -106,21 +108,52 @@ function fromSpin(row) {
   };
 }
 
-async function findCustomerById(id) {
-  const [rows] = await pool.execute(
-    "SELECT * FROM lucky_draw_customers WHERE id = ?",
-    [id],
+function isDisconnectError(error) {
+  if (!error) return false;
+  const code = error.code || "";
+  const message = error.message || "";
+  return (
+    code === "PROTOCOL_CONNECTION_LOST" ||
+    code === "ECONNRESET" ||
+    code === "ETIMEDOUT" ||
+    code === "EPIPE" ||
+    code === "PROTOCOL_ENVELOPE_AFTER_DISCONNECT" ||
+    code === "ER_SOCKET_UNEXPECTED_CLOSE" ||
+    code === "PROTOCOL_PACKETS_OUT_OF_ORDER" ||
+    error.fatal === true ||
+    message.includes("Connection lost") ||
+    message.includes("read ECONNRESET")
   );
-  return rows[0] ? toCustomer(rows[0]) : null;
 }
 
-async function retryAfterLostConnection(operation) {
-  try {
-    return await operation();
-  } catch (error) {
-    if (error.code !== "PROTOCOL_CONNECTION_LOST") throw error;
-    return operation();
+async function retryAfterLostConnection(operation, maxRetries = 3) {
+  let attempts = 0;
+  while (true) {
+    try {
+      attempts++;
+      return await operation();
+    } catch (error) {
+      if (attempts < maxRetries && isDisconnectError(error)) {
+        console.warn(
+          `[MySQL] Connection reset/lost (${error.code || error.message}), retrying query (attempt ${attempts}/${maxRetries})...`,
+        );
+        initialization = undefined;
+        await new Promise((resolve) => setTimeout(resolve, 300 * attempts));
+        continue;
+      }
+      throw error;
+    }
   }
+}
+
+async function findCustomerById(id) {
+  return retryAfterLostConnection(async () => {
+    const [rows] = await pool.execute(
+      "SELECT * FROM lucky_draw_customers WHERE id = ?",
+      [id],
+    );
+    return rows[0] ? toCustomer(rows[0]) : null;
+  });
 }
 
 export async function initializeLuckyDrawDatabase() {
@@ -192,33 +225,39 @@ export async function initializeLuckyDrawDatabase() {
 
 export async function readLuckyDrawCustomers() {
   await initializeLuckyDrawDatabase();
-  const [rows] = await pool.query(
-    "SELECT * FROM lucky_draw_customers ORDER BY id",
-  );
-  return rows.map(toCustomer);
+  return retryAfterLostConnection(async () => {
+    const [rows] = await pool.query(
+      "SELECT * FROM lucky_draw_customers ORDER BY id",
+    );
+    return rows.map(toCustomer);
+  });
 }
 
 export async function readLuckyDrawSpins() {
   await initializeLuckyDrawDatabase();
-  const [rows] = await pool.query(
-    `SELECT spin_id, winner,
-      DATE_FORMAT(spun_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS spun_at
-     FROM lucky_draw_spins
-     ORDER BY spun_at, id`,
-  );
-  return rows.map(fromSpin);
+  return retryAfterLostConnection(async () => {
+    const [rows] = await pool.query(
+      `SELECT spin_id, winner,
+        DATE_FORMAT(spun_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS spun_at
+       FROM lucky_draw_spins
+       ORDER BY spun_at, id`,
+    );
+    return rows.map(fromSpin);
+  });
 }
 
 export async function readLatestLuckyDrawSpin() {
   await initializeLuckyDrawDatabase();
-  const [rows] = await pool.query(
-    `SELECT spin_id, winner,
-      DATE_FORMAT(spun_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS spun_at
-     FROM lucky_draw_spins
-     ORDER BY spun_at DESC, id DESC
-     LIMIT 1`,
-  );
-  return rows[0] ? fromSpin(rows[0]) : null;
+  return retryAfterLostConnection(async () => {
+    const [rows] = await pool.query(
+      `SELECT spin_id, winner,
+        DATE_FORMAT(spun_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS spun_at
+       FROM lucky_draw_spins
+       ORDER BY spun_at DESC, id DESC
+       LIMIT 1`,
+    );
+    return rows[0] ? fromSpin(rows[0]) : null;
+  });
 }
 
 export async function appendLuckyDrawSpin(spin, { isRespin = false } = {}) {

@@ -10,7 +10,7 @@ const emptyStore = {
   users: [],
   orders: [],
   luckyDrawSettings: {
-    wheelEnabled: false,
+    wheelEnabled: true,
     annualEligibilityEnabled: true,
     includeAllEntriesNextDraw: false,
     includeAllThisMonthEntriesNextDraw: false,

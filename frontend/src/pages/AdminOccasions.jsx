@@ -5,16 +5,17 @@ import {
 } from "../services/api";
 import "../App.css";
 import "./LuckyDraw.css";
+import logoImg from "../assets/landing_page/logo.jpg";
 
 function AdminOccasions() {
   const [adminToken] = useState(
     () => window.localStorage.getItem("bnb-admin-token") || "",
   );
   const [celebrationOccasions, setCelebrationOccasions] = useState([]);
-  const [savedOccasions, setSavedOccasions] = useState([]);
   const [newOccasion, setNewOccasion] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [busyOccasion, setBusyOccasion] = useState("");
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -32,7 +33,6 @@ function AdminOccasions() {
           : [];
         if (isActive) {
           setCelebrationOccasions(occasions);
-          setSavedOccasions(occasions);
         }
       })
       .catch((loadError) => {
@@ -54,53 +54,83 @@ function AdminOccasions() {
     };
   }, [adminToken]);
 
-  const hasUnsavedChanges =
-    celebrationOccasions.length !== savedOccasions.length ||
-    celebrationOccasions.some(
-      (occasion, index) => occasion !== savedOccasions[index],
-    );
-
-  const handleAddOccasion = (event) => {
+  const handleAddOccasion = async (event) => {
     event.preventDefault();
     const occasion = newOccasion.trim();
-    if (
-      !occasion ||
-      occasion.length > 40 ||
-      celebrationOccasions.length >= 20 ||
-      celebrationOccasions.some(
-        (existing) => existing.toLocaleLowerCase() === occasion.toLocaleLowerCase(),
-      )
-    ) {
+    if (!occasion) return;
+
+    if (occasion.length > 40) {
+      setError("Occasion name cannot exceed 40 characters.");
       return;
     }
 
-    setCelebrationOccasions((current) => [...current, occasion]);
-    setNewOccasion("");
-    setError("");
-    setStatusMessage("");
-  };
+    if (celebrationOccasions.length >= 20) {
+      setError("Maximum 20 occasions allowed.");
+      return;
+    }
 
-  const handleSaveOccasions = async () => {
-    setIsSaving(true);
+    if (
+      celebrationOccasions.some(
+        (existing) =>
+          existing.toLocaleLowerCase() === occasion.toLocaleLowerCase(),
+      )
+    ) {
+      setError(`"${occasion}" already exists.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setBusyOccasion("__adding__");
     setError("");
     setStatusMessage("");
+
+    const nextOccasions = [...celebrationOccasions, occasion];
     try {
-      const result = await updateLuckyDrawOccasions(
-        adminToken,
-        celebrationOccasions,
-      );
+      const result = await updateLuckyDrawOccasions(adminToken, nextOccasions);
       setCelebrationOccasions(result.celebrationOccasions);
-      setSavedOccasions(result.celebrationOccasions);
-      setStatusMessage("Special occasions saved.");
+      setNewOccasion("");
+      setStatusMessage(`Added "${occasion}".`);
     } catch (saveError) {
       if (saveError.message === "Admin access is required") {
         window.localStorage.removeItem("bnb-admin-token");
         window.location.replace("/admin");
         return;
       }
-      setError(saveError.message || "Unable to save special occasions.");
+      setError(saveError.message || "Unable to add occasion.");
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
+      setBusyOccasion("");
+    }
+  };
+
+  const handleRemoveOccasion = async (occasionToRemove) => {
+    if (celebrationOccasions.length <= 1) {
+      setError("At least one occasion option is required.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setBusyOccasion(occasionToRemove);
+    setError("");
+    setStatusMessage("");
+
+    const nextOccasions = celebrationOccasions.filter(
+      (item) => item !== occasionToRemove,
+    );
+    try {
+      const result = await updateLuckyDrawOccasions(adminToken, nextOccasions);
+      setCelebrationOccasions(result.celebrationOccasions);
+      setStatusMessage(`Removed "${occasionToRemove}".`);
+    } catch (saveError) {
+      if (saveError.message === "Admin access is required") {
+        window.localStorage.removeItem("bnb-admin-token");
+        window.location.replace("/admin");
+        return;
+      }
+      setError(saveError.message || "Unable to remove occasion.");
+    } finally {
+      setIsSubmitting(false);
+      setBusyOccasion("");
     }
   };
 
@@ -110,7 +140,7 @@ function AdminOccasions() {
     <main className="admin-shell">
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
-          <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
+          <img src={logoImg} alt="Binge N Bliss" />
           <span>BNB admin</span>
         </a>
         <nav className="admin-nav">
@@ -124,7 +154,9 @@ function AdminOccasions() {
           </a>
           <a href="/admin/customers">Customers</a>
           <a href="/admin/winner-history">Winner history</a>
-          <a href="/lucky-draw">Customer site</a>
+          <a href="/lucky-draw" target="_blank" rel="noopener noreferrer">
+            Customer site
+          </a>
         </nav>
         <button
           className="admin-signout"
@@ -155,8 +187,7 @@ function AdminOccasions() {
             <span className="draw-reveal-kicker">Customer registration</span>
             <h2 id="admin-occasion-settings-title">Occasion options</h2>
             <p>
-              Add or remove choices in the registration dropdown. Changes take
-              effect after you save.
+              Add or remove choices in the registration dropdown.
             </p>
           </div>
           {isLoading ? (
@@ -173,13 +204,16 @@ function AdminOccasions() {
                   maxLength={40}
                   placeholder="Add an occasion"
                   aria-label="New special occasion"
-                  disabled={isSaving || celebrationOccasions.length >= 20}
-                  onChange={(event) => setNewOccasion(event.target.value)}
+                  disabled={isSubmitting || celebrationOccasions.length >= 20}
+                  onChange={(event) => {
+                    setNewOccasion(event.target.value);
+                    if (error) setError("");
+                  }}
                 />
                 <button
                   type="submit"
                   disabled={
-                    isSaving ||
+                    isSubmitting ||
                     !newOccasion.trim() ||
                     celebrationOccasions.length >= 20 ||
                     celebrationOccasions.some(
@@ -189,7 +223,7 @@ function AdminOccasions() {
                     )
                   }
                 >
-                  Add
+                  {busyOccasion === "__adding__" ? "Adding..." : "Add"}
                 </button>
               </form>
               <ul className="admin-occasion-list">
@@ -199,32 +233,14 @@ function AdminOccasions() {
                     <button
                       type="button"
                       aria-label={`Remove ${occasion}`}
-                      disabled={isSaving || celebrationOccasions.length <= 1}
-                      onClick={() => {
-                        setCelebrationOccasions((current) =>
-                          current.filter((item) => item !== occasion),
-                        );
-                        setError("");
-                        setStatusMessage("");
-                      }}
+                      disabled={isSubmitting || celebrationOccasions.length <= 1}
+                      onClick={() => handleRemoveOccasion(occasion)}
                     >
-                      Remove
+                      {busyOccasion === occasion ? "Removing..." : "Remove"}
                     </button>
                   </li>
                 ))}
               </ul>
-              <button
-                className="admin-save-occasions"
-                type="button"
-                disabled={
-                  isSaving ||
-                  celebrationOccasions.length < 1 ||
-                  !hasUnsavedChanges
-                }
-                onClick={handleSaveOccasions}
-              >
-                {isSaving ? "Saving occasions..." : "Save occasions"}
-              </button>
             </>
           )}
           {error && (

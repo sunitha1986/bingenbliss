@@ -82,12 +82,14 @@ https://pngtree.com/pay/pay-event-page?b=51
 
 https://mysql.site4now.net/index.php?route=/table/import&db=db_a26f8d_troy&table=states\
 
-Database 
+
+Database - 
 
 host - mysql5036.site4now.net
-db name -  db_ac5b80_binge
 uname - ac5b80_binge
 pass - Binge@2026
+
+
 
 
 
@@ -97,3 +99,58 @@ password -  Binge@2026
 host -- win8153.site4now.net
 
 https://bingenbliss.vasmigroup.com
+
+
+CREATE TABLE test_sunitha_students (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    age INT
+);
+
+
+
+
+
+
+
+
+
+
+
+
+13-10-2026:
+
+1. removed - scheduler logic.
+2. Kept only manual logic.
+3. status - 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

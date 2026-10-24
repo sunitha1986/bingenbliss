@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import GetTheAppButton from "../components/GetTheAppButton";
 import { testAdminCredentials } from "../testCredentials";
 import {useNavigate} from "react-router-dom"
 import {
@@ -13,48 +14,64 @@ import {
 } from "../services/api";
 import "../App.css";
 import "./LandingPage.css";
-import heroPhoto from "/landing_page/heroIMG.jpg";
+import heroPhoto from "../assets/landing_page/heroIMG.jpg";
+import birthdayCakeImg from "../assets/landing_page/birthdayCake.jpg";
+import bouquetImg from "../assets/landing_page/boquetImg.png";
+import giftsImg from "../assets/landing_page/gifts.jpg";
+import decorationImg from "../assets/landing_page/decorationImg.png";
+import grandEntryImg from "../assets/landing_page/grandEntry.png";
+import photoShootImg from "../assets/landing_page/photoShoot.jpg";
+import anniversaryDayImg from "../assets/landing_page/anniversaryDay.jpg";
+import loveBlissImg from "../assets/landing_page/loveBliss.jpg";
+import kidsBlissImg from "../assets/landing_page/kidsBliss.jpg";
+import privateMovieScreeningImg from "../assets/landing_page/privateMovieScreening.jpg";
+import birthdayGalleryImg from "../assets/landing_page/birthday-gallery.webp";
+import screeningGalleryImg from "../assets/landing_page/screening-gallery.webp";
+import gallery1Img from "../assets/landing_page/gallery-1.webp";
+import gallery2Img from "../assets/landing_page/gallery-2.webp";
+import gallery3Img from "../assets/landing_page/gallery-3.webp";
+import gallery4Img from "../assets/landing_page/gallery-4.webp";
 
 const services = [
   {
     title: "Birthday Cake",
     description: "Customized cakes for special moments.",
-    image: "/landing_page/birthdayCake.jpg",
+    image: birthdayCakeImg,
     imageAlt: "Celebration cake",
     icon: "✿",
   },
   {
     title: "Bouquet",
     description: "Fresh and premium flowers for your loved ones.",
-    image: "/landing_page/boquetImg.png",
+    image: bouquetImg,
     imageAlt: "Anniversary flower arrangement",
     icon: "❀",
   },
   {
     title: "Gifts",
     description: "Surprise gifts and personalized gifts for every occasion.",
-    image: "/landing_page/gifts.jpg",
+    image: giftsImg,
     imageAlt: "Wrapped celebration gifts",
     icon: "◇",
   },
   {
     title: "Decoration",
     description: "Beautiful and themed decorations for your celebration.",
-    image: "/landing_page/decorationImg.png",
+    image: decorationImg,
     imageAlt: "Birthday celebration decorations",
     icon: "✧",
   },
   {
     title: "Grand Entry",
     description: "Make your entry special with unique arrangements.",
-    image: "/landing_page/grandEntry.png",
+    image: grandEntryImg,
     imageAlt: "Decorated grand entrance",
     icon: "☆",
   },
   {
     title: "Photoshoot",
     description: "Professional photography to capture your memories.",
-    image: "/landing_page/photoShoot.jpg",
+    image: photoShootImg,
     imageAlt: "Celebration photoshoot",
     icon: "◉",
   },
@@ -74,35 +91,35 @@ const celebrationExperiences = [
   {
     title: "BirthBliss",
     description: "For birthdays worth remembering.",
-    image: "/landing_page/decorationImg.png",
+    image: decorationImg,
     imageAlt: "Colorful birthday decorations",
     color: "rose",
   },
   {
     title: "AnniversaryBliss",
     description: "Celebrate another beautiful year together.",
-    image: "/landing_page/anniversaryDay.jpg",
+    image: anniversaryDayImg,
     imageAlt: "Anniversary celebration setup",
     color: "pink",
   },
   {
     title: "LoveBliss",
     description: "For proposals, surprises and romantic moments.",
-    image: "/landing_page/loveBliss.jpg",
+    image: loveBlissImg,
     imageAlt: "Romantic celebration decor",
     color: "lavender",
   },
   {
     title: "KidsBliss",
     description: "Big happiness for little celebrations.",
-    image: "/landing_page/kidsBliss.jpg",
+    image: kidsBlissImg,
     imageAlt: "Kids celebration setup",
     color: "mint",
   },
   {
     title: "Private Screening",
     description: "Enjoy a private movie screening with your favorite people.",
-    image: "/landing_page/privateMovieScreening.jpg",
+    image: privateMovieScreeningImg,
     imageAlt: "Friends enjoying a private movie screening",
     color: "violet",
   },
@@ -130,9 +147,10 @@ function orderExperiencesAroundSelection(selectedTitle) {
 }
 
 function formatDrawDate(drawDate) {
+  if (!drawDate || !/^\d{4}-\d{2}-\d{2}$/.test(drawDate)) return "";
   const [year, month, day] = drawDate.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString(
-    undefined,
+    "en-IN",
     {
       year: "numeric",
       month: "long",
@@ -142,23 +160,7 @@ function formatDrawDate(drawDate) {
   );
 }
 
-function formatDrawTime(time) {
-  const [hours, minutes] = time.split(":").map(Number);
-  return new Date(Date.UTC(2000, 0, 1, hours, minutes)).toLocaleTimeString(
-    undefined,
-    {
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: "UTC",
-    }
-  );
-}
 
-function formatNextDrawDate(drawDate, drawTime) {
-  const formattedDate = formatDrawDate(drawDate);
-  const formattedTime = drawTime ? ` at ${formatDrawTime(drawTime)}` : "";
-  return `${formattedDate}${formattedTime}`;
-}
 
 function formatCustomerProfileDate(date) {
   if (!date) return "Not provided";
@@ -206,42 +208,42 @@ const galleryItems = [
     title: "Birthday Bash",
     category: "Celebration",
     tagline: "Colourful moments made magical",
-    image: "/landing_page/birthday-gallery.webp",
+    image: birthdayGalleryImg,
     imageAlt: "Birthday celebration gallery",
   },
   {
     title: "Private Screening",
     category: "Experience",
     tagline: "Movie nights with a premium touch",
-    image: "/landing_page/screening-gallery.webp",
+    image: screeningGalleryImg,
     imageAlt: "Private screening gallery",
   },
   {
     title: "Dreamy Decor",
     category: "Styling",
     tagline: "Styled spaces that tell a story",
-    image: "/landing_page/gallery-1.webp",
+    image: gallery1Img,
     imageAlt: "Dreamy decor gallery",
   },
   {
     title: "Grand Arrival",
     category: "Entrance",
     tagline: "A dramatic start to the celebration",
-    image: "/landing_page/gallery-2.webp",
+    image: gallery2Img,
     imageAlt: "Grand arrival decoration",
   },
   {
     title: "Sweet Surprises",
     category: "Gifts",
     tagline: "Thoughtful details and heartfelt gifting",
-    image: "/landing_page/gallery-3.webp",
+    image: gallery3Img,
     imageAlt: "Gift and surprise styling",
   },
   {
     title: "Cinema Glow",
     category: "Mood",
     tagline: "Warm, cinematic ambience for every guest",
-    image: "/landing_page/gallery-4.webp",
+    image: gallery4Img,
     imageAlt: "Cinematic ambience gallery",
   },
 ];
@@ -333,8 +335,8 @@ function LandingPage() {
   const [monthlyDraw, setMonthlyDraw] = useState(null);
   const [monthlyDrawSlide, setMonthlyDrawSlide] = useState(0);
   const nextDrawDate =
-    monthlyDraw?.drawConfigurationReady && monthlyDraw.drawDate
-      ? formatNextDrawDate(monthlyDraw.drawDate, monthlyDraw.drawTime)
+    monthlyDraw?.nextDrawDate || monthlyDraw?.drawDate
+      ? formatDrawDate(monthlyDraw.nextDrawDate || monthlyDraw.drawDate)
       : "Date to be announced";
   const isMobileGallery =
     typeof window !== "undefined" && window.innerWidth <= 480;
@@ -362,6 +364,7 @@ function LandingPage() {
             wheelEnabled: status.wheelEnabled === true,
             lastWinnerName: status.lastWinnerName || "",
             lastWinnerMonth: status.lastWinnerMonth || "",
+            nextDrawDate: status.nextDrawDate || status.drawDate || "",
           });
           if (status?.winner) {
             const w = status.winner;
@@ -748,6 +751,7 @@ function LandingPage() {
             every kind of gathering.
           </p>
 
+          <GetTheAppButton variant="hero" />
         </div>
       </section>
 

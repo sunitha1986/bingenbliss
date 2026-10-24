@@ -1,4 +1,5 @@
 import { contactPhone } from "../config/contact";
+import logoImg from "../assets/landing_page/logo.jpg";
 
 const footerAddress =
   "Door No 13-43, HIG-18, Main Rd, opposite Vedanta Hospital, Anand Nagar, SBI Colony, Pothinamallayya Palem, Potinamallayyapalem, Andhra Pradesh 530041";
@@ -98,7 +99,7 @@ function Footer({ standalone = false }) {
           href={standalone ? "/" : "#top"}
           aria-label="Binge N Bliss home"
         >
-          <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
+          <img src={logoImg} alt="Binge N Bliss" />
         </a>
         <nav className="footer-navigation" aria-label="Footer navigation">
           <h2>Company</h2>
