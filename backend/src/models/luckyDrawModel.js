@@ -12,12 +12,6 @@ import {
 const defaultCelebrationOccasions = [
   "Birthday party",
   "Anniversary",
-  "Kitty party",
-  "Private theatre",
-  "Mini theatre",
-  "Photography",
-  "Customize lucky draw",
-  "Other",
 ];
 
 export async function getLuckyDrawWheelEnabled() {
@@ -26,16 +20,17 @@ export async function getLuckyDrawWheelEnabled() {
   if (
     autoResetAt &&
     Date.now() >= autoResetAt &&
-    store.luckyDrawSettings?.wheelEnabled
+    store.luckyDrawSettings?.isDrawing
   ) {
-    store.luckyDrawSettings.wheelEnabled = false;
     store.luckyDrawSettings.autoResetVisibilityAt = 0;
     store.luckyDrawSettings.isDrawing = false;
     store.luckyDrawSettings.drawingUntil = 0;
     await writeStore(store);
-    return false;
   }
-  return Boolean(store.luckyDrawSettings?.wheelEnabled);
+  if (typeof store.luckyDrawSettings?.wheelEnabled === "boolean") {
+    return store.luckyDrawSettings.wheelEnabled;
+  }
+  return true;
 }
 
 export async function setLuckyDrawWheelEnabled(enabled) {
@@ -95,12 +90,28 @@ export async function getLuckyDrawFeatureSettings() {
       typeof settings.includeAllThisMonthEntriesMonth === "string"
         ? settings.includeAllThisMonthEntriesMonth
         : "",
+    nextDrawDate:
+      typeof settings.nextDrawDate === "string" ? settings.nextDrawDate : "",
+    drawDate:
+      typeof settings.nextDrawDate === "string" ? settings.nextDrawDate : "",
     celebrationOccasions:
       Array.isArray(settings.celebrationOccasions) &&
       settings.celebrationOccasions.length > 0
         ? settings.celebrationOccasions
         : defaultCelebrationOccasions,
   };
+}
+
+export async function setLuckyDrawNextDrawDate(nextDrawDate) {
+  const store = await readStore();
+  const cleanDate = typeof nextDrawDate === "string" ? nextDrawDate.trim() : "";
+  store.luckyDrawSettings = {
+    ...store.luckyDrawSettings,
+    nextDrawDate: cleanDate,
+    drawDate: cleanDate,
+  };
+  await writeStore(store);
+  return cleanDate;
 }
 
 export async function setLuckyDrawCelebrationOccasions(occasions) {
@@ -190,11 +201,30 @@ export async function setLuckyDrawManualDrawCompleted() {
 }
 
 export async function getLuckyDrawLastSpin() {
-  return readLatestLuckyDrawSpin();
+  try {
+    return await readLatestLuckyDrawSpin();
+  } catch (error) {
+    console.error(
+      "[luckyDrawModel] Failed to read latest spin from database:",
+      error.message,
+    );
+    const store = await readStore();
+    const history = store.luckyDrawHistory || [];
+    return history[history.length - 1] || null;
+  }
 }
 
 export async function getLuckyDrawWinnerHistory() {
-  return readLuckyDrawSpins();
+  try {
+    return await readLuckyDrawSpins();
+  } catch (error) {
+    console.error(
+      "[luckyDrawModel] Failed to read spins from database:",
+      error.message,
+    );
+    const store = await readStore();
+    return store.luckyDrawHistory || [];
+  }
 }
 
 export async function recordLuckyDrawSpin(winner, options) {

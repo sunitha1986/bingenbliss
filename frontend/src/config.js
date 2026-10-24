@@ -1,13 +1,16 @@
-const config = {
-  API_BASE_URL: import.meta.env.DEV
-    ? `http://${window.location.hostname}:4000`
-    : window.location.origin,
-};
+// const config = {
+//   API_BASE_URL: import.meta.env.DEV
+//     ? `http://${window.location.hostname}:4000`
+//     : window.location.origin,
+// };
 
 //production build will use the same origin as the frontend, so we can just use window.location.origin
 // const config = {
 //   API_BASE_URL: "https://bingenbliss.vasmigroup.com/",
 // };
+const config = {
+  API_BASE_URL: "https://bingenbliss.in",
+};
 
 export const getImageUrl = (url) => {
   if (!url) return "";

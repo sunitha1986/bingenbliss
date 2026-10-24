@@ -1,6 +1,7 @@
 import { useState } from "react";
 import LuckyDrawBanner from "./LuckyDrawBanner";
 import EnquiryForm from "./Enquiryform";
+import logoImg from "../assets/landing_page/logo.jpg";
 
 function Navbar({
   user,
@@ -17,7 +18,7 @@ function Navbar({
       {luckyDrawBanner && <LuckyDrawBanner banner={luckyDrawBanner} />}
       <nav className="nav-bar" aria-label="Main navigation">
         <a className="brand" href="/" aria-label="Binge N Bliss home">
-          <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
+          <img src={logoImg} alt="Binge N Bliss" />
           <span className="brand-name">Binge n Bliss</span>
         </a>
 

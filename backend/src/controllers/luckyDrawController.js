@@ -23,6 +23,7 @@ import {
   recordLuckyDrawSpin,
   saveOrder,
   setLuckyDrawCelebrationOccasions,
+  setLuckyDrawNextDrawDate,
   setLuckyDrawIncludeAllEntriesNextDraw as saveIncludeAllEntriesNextDraw,
   setLuckyDrawIncludeAllThisMonthEntriesNextDraw as saveIncludeAllThisMonthEntriesNextDraw,
   setLuckyDrawFeatureSettings,
@@ -33,6 +34,7 @@ import {
 } from "../models/luckyDrawModel.js";
 import { getEligibleLuckyDrawCustomers } from "../services/luckyDrawEligibility.js";
 import {
+  getIndiaDrawCountsByMonth,
   getIndiaDrawCycle,
   getIndiaDrawDate,
 } from "../utils/indiaDate.js";
@@ -408,6 +410,8 @@ export async function luckyDrawStatus(request, response, next) {
       },
     );
     const currentCycle = getIndiaDrawCycle();
+    const { year: drawCountYear, counts: drawCountsByMonth } =
+      getIndiaDrawCountsByMonth(winnerHistory);
     const hasWinnerForCurrentCycle = winnerHistory.some((spin) => {
       const spunAt = new Date(spin?.spunAt || "");
       return (
@@ -425,10 +429,16 @@ export async function luckyDrawStatus(request, response, next) {
       ...featureSettings,
       manualDrawCompleted,
       hasWinnerForCurrentCycle,
+      drawCountYear,
+      drawCountsByMonth,
       lastSpin,
       entries: eligibleCustomers.map((customer, index) => ({
         id: String(index),
         name: customer.Name,
+        celebrationDate:
+          customer["Celebration date"] ||
+          customer["Date of birth"] ||
+          "",
       })),
     });
   } catch (error) {
@@ -438,11 +448,26 @@ export async function luckyDrawStatus(request, response, next) {
 
 export async function luckyDrawLatestWinner(request, response, next) {
   try {
-    const [wheelEnabled, winnerHistory] = await Promise.all([
+    const [wheelEnabled, winnerHistory, spinningState] = await Promise.all([
       getLuckyDrawWheelEnabled(),
       getLuckyDrawWinnerHistory(),
+      getLuckyDrawSpinningState(),
     ]);
-    const latestWinner = winnerHistory
+    const completedWinnerHistory =
+      spinningState.isDrawing && spinningState.drawingWinner
+        ? winnerHistory.filter((spin) => {
+            const w = spin?.winner;
+            const dw = spinningState.drawingWinner;
+            if (!w || !dw) return true;
+            return !(
+              (w.id && dw.id && String(w.id) === String(dw.id)) ||
+              ((w.Phone || w.phone) &&
+                (dw.Phone || dw.phone) &&
+                (w.Phone || w.phone) === (dw.Phone || dw.phone))
+            );
+          })
+        : winnerHistory;
+    const latestWinner = completedWinnerHistory
       .filter(
         (spin) =>
           spin?.winner && Number.isFinite(Date.parse(spin.spunAt || "")),
@@ -455,8 +480,12 @@ export async function luckyDrawLatestWinner(request, response, next) {
       ? new Date(latestWinner.spunAt)
       : null;
 
+    const featureSettings = await getLuckyDrawFeatureSettings();
+
     return response.json({
       wheelEnabled,
+      nextDrawDate: featureSettings.nextDrawDate || "",
+      drawDate: featureSettings.nextDrawDate || "",
       winner: latestWinner?.winner || null,
       lastWinnerName:
         latestWinner?.winner?.Name ||
@@ -524,6 +553,17 @@ export async function spinLuckyDraw(request, response, next) {
       return response.status(401).json({ message: "Admin access is required" });
     }
 
+    const celebrationMonth = Number(request.body?.celebrationMonth);
+    if (
+      !Number.isInteger(celebrationMonth) ||
+      celebrationMonth < 1 ||
+      celebrationMonth > 12
+    ) {
+      return response
+        .status(400)
+        .json({ message: "Choose a valid celebration month before spinning." });
+    }
+
     const isRespin = Boolean(request.body?.respin || request.body?.isRespin);
     const lockKey = getIndiaDrawCycle();
     const draw = await withLuckyDrawCycleLock(lockKey, async () => {
@@ -552,7 +592,7 @@ export async function spinLuckyDraw(request, response, next) {
         };
       }
 
-      let eligibleCustomers = getEligibleLuckyDrawCustomers(
+      const eligibleCustomers = getEligibleLuckyDrawCustomers(
         customers,
         winnerHistory,
         featureSettings.previousWinnerExclusionEnabled,
@@ -561,18 +601,12 @@ export async function spinLuckyDraw(request, response, next) {
           includeAllThisMonthEntries:
             featureSettings.includeAllThisMonthEntriesNextDraw,
           entriesMonth: featureSettings.includeAllThisMonthEntriesMonth,
+          celebrationMonth,
         },
       );
-      if (!eligibleCustomers.length && isRespin) {
-        eligibleCustomers = getEligibleLuckyDrawCustomers(
-          customers,
-          [],
-          false,
-        );
-      }
       if (!eligibleCustomers.length) {
         return {
-          error: "No eligible lucky draw entries are available",
+          error: "No eligible customers have a celebration in the selected month.",
           status: 400,
         };
       }
@@ -763,6 +797,20 @@ export async function updateLuckyDrawOccasions(request, response, next) {
     const celebrationOccasions =
       await setLuckyDrawCelebrationOccasions(normalizedOccasions);
     return response.json({ celebrationOccasions });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function updateLuckyDrawNextDrawDate(request, response, next) {
+  try {
+    if (!isAdminToken(request.get("authorization")?.replace("Bearer ", ""))) {
+      return response.status(401).json({ message: "Admin access is required" });
+    }
+
+    const { nextDrawDate } = request.body || {};
+    const updated = await setLuckyDrawNextDrawDate(nextDrawDate);
+    return response.json({ nextDrawDate: updated, drawDate: updated });
   } catch (error) {
     return next(error);
   }

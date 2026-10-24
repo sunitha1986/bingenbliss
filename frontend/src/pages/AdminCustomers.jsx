@@ -7,6 +7,7 @@ import {
 } from "../services/api";
 import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
 import { createCustomerWorkbook } from "../utils/customerWorkbook.js";
+import logoImg from "../assets/landing_page/logo.jpg";
 import "../App.css";
 
 function getCurrentMonthValue() {
@@ -223,8 +224,6 @@ function AdminCustomers() {
       occasion: customer.Occasion || "",
       celebrationDate:
         customer["Celebration date"] || customer["Date of birth"] || "",
-      dob:
-        customer["Date of birth"] || customer["Celebration date"] || "",
       guests: String(customer.Guests ?? 1),
       consent: customer.Consent || "Yes",
       submittedAt: toLocalDateTimeInput(
@@ -241,6 +240,7 @@ function AdminCustomers() {
     try {
       const result = await updateAdminCustomer(adminToken, editingId, {
         ...editForm,
+        dob: editForm.celebrationDate,
         submittedAt: new Date(editForm.submittedAt).toISOString(),
       });
       setCustomers((current) =>
@@ -294,7 +294,7 @@ function AdminCustomers() {
     <main className="admin-shell">
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
-          <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
+          <img src={logoImg} alt="Binge N Bliss" />
           <span>BNB admin</span>
         </a>
         <nav className="admin-nav">
@@ -305,7 +305,9 @@ function AdminCustomers() {
           </a>
           <AdminEnquiriesLink />
           <a href="/admin/winner-history">Winner history</a>
-          <a href="/lucky-draw">Customer site</a>
+          <a href="/lucky-draw" target="_blank" rel="noopener noreferrer">
+            Customer site
+          </a>
         </nav>
         <button
           className="admin-signout"
@@ -537,7 +539,7 @@ function AdminCustomers() {
                         <th>Name</th>
                         <th>WhatsApp</th>
                         <th>Occasion</th>
-                        <th>Date</th>
+                        <th>Occasion Date</th>
                         <th>Guests</th>
                         <th>Consent</th>
                         <th>Submitted at</th>
@@ -667,7 +669,7 @@ function AdminCustomers() {
                       </select>
                     </label>
                     <label>
-                      Celebration date
+                      Occasion Date
                       <input
                         type="date"
                         value={editForm.celebrationDate || ""}
@@ -675,20 +677,6 @@ function AdminCustomers() {
                           setEditForm((current) => ({
                             ...current,
                             celebrationDate: event.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-                    <label>
-                      Date of birth
-                      <input
-                        type="date"
-                        value={editForm.dob || ""}
-                        onChange={(event) =>
-                          setEditForm((current) => ({
-                            ...current,
-                            dob: event.target.value,
                           }))
                         }
                         required

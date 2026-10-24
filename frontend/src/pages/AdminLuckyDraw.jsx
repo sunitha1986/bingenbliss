@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   adminLogin,
   getLuckyDrawStatus,
-  setLuckyDrawIncludeAllEntriesNextDraw,
-  setLuckyDrawIncludeAllThisMonthEntriesNextDraw,
-  setLuckyDrawVisibility,
   spinLuckyDraw,
   updateLuckyDrawFeatures,
+  updateLuckyDrawNextDrawDate,
 } from "../services/api";
 import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
 import { createClientId } from "../utils/createClientId";
 import "../App.css";
 import "./LuckyDraw.css";
+import logoImg from "../assets/landing_page/logo.jpg";
+import winnerCardTemplateImg from "../assets/lucky_draw_registration/winner_card_template.png";
 
 function formatLast4Phone(phone) {
   const clean = (phone || "").replace(/\D/g, "");
@@ -26,11 +27,37 @@ function normalizeDrawEntries(entries = []) {
     ...entry,
     id: String(entry.id ?? index),
     name: entry.name || "",
+    celebrationDate:
+      entry.celebrationDate ||
+      entry.date ||
+      entry["Celebration date"] ||
+      entry["Date of birth"] ||
+      "",
   }));
 }
 
+const drawMonths = Array.from({ length: 12 }, (_, monthIndex) =>
+  new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(
+    new Date(Date.UTC(2024, monthIndex, 1)),
+  ),
+);
+
+function getEntryMonth(entry) {
+  const month = String(entry.celebrationDate).match(/^\d{4}-(\d{2})/)?.[1];
+  return month ? Number(month) : null;
+}
+
 function AdminLuckyDraw() {
+  const navigate = useNavigate();
   const [entries, setEntries] = useState([]);
+  const [drawCountsByMonth, setDrawCountsByMonth] = useState({});
+  const [drawCountYear, setDrawCountYear] = useState(new Date().getFullYear());
+  const [selectedDrawMonth, setSelectedDrawMonth] = useState(() =>
+    new Intl.DateTimeFormat("en", {
+      month: "long",
+      timeZone: "Asia/Kolkata",
+    }).format(new Date()),
+  );
   const [adminToken, setAdminToken] = useState(
     () => window.localStorage.getItem("bnb-admin-token") || "",
   );
@@ -43,28 +70,20 @@ function AdminLuckyDraw() {
   const [winner, setWinner] = useState(null);
   const [showWinnerPopup, setShowWinnerPopup] = useState(false);
   const [whatsappLink, setWhatsappLink] = useState("");
-  const [wheelEnabled, setWheelEnabled] = useState(false);
+  const [, setWheelEnabled] = useState(true);
   const [manualDrawCompleted, setManualDrawCompleted] = useState(false);
   const [hasWinnerForCurrentCycle, setHasWinnerForCurrentCycle] =
     useState(false);
-  const [customerVisibilityDecision, setCustomerVisibilityDecision] =
-    useState(null);
-  const [includeAllEntriesNextDraw, setIncludeAllEntriesNextDraw] =
-    useState(false);
-  const [
-    includeAllThisMonthEntriesNextDraw,
-    setIncludeAllThisMonthEntriesNextDraw,
-  ] = useState(false);
-  const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
-  const [isUpdatingEligibilityReset, setIsUpdatingEligibilityReset] =
-    useState(false);
-  const [isUpdatingMonthEntries, setIsUpdatingMonthEntries] = useState(false);
+
   const [eligibilityRules, setEligibilityRules] = useState({
     annualEligibilityEnabled: true,
     previousWinnerExclusionEnabled: true,
   });
   const [isSavingEligibilityRules, setIsSavingEligibilityRules] =
     useState(false);
+  const [nextDrawDate, setNextDrawDate] = useState("");
+  const [isSavingNextDrawDate, setIsSavingNextDrawDate] = useState(false);
+  const [nextDrawDateSaved, setNextDrawDateSaved] = useState(false);
   const [isAdminStatusLoaded, setIsAdminStatusLoaded] = useState(false);
 
   useEffect(() => {
@@ -72,10 +91,7 @@ function AdminLuckyDraw() {
     setIsAdminStatusLoaded(false);
     getLuckyDrawStatus()
       .then((status) => {
-        setWheelEnabled(status.wheelEnabled);
-        if (typeof status.wheelEnabled === "boolean") {
-          setCustomerVisibilityDecision(status.wheelEnabled);
-        }
+        setWheelEnabled(status.wheelEnabled ?? true);
         const drawDone = Boolean(
           status.manualDrawCompleted || status.hasWinnerForCurrentCycle,
         );
@@ -83,26 +99,28 @@ function AdminLuckyDraw() {
         setHasWinnerForCurrentCycle(Boolean(status.hasWinnerForCurrentCycle));
         if (status.lastSpin?.winner) {
           const w = status.lastSpin.winner;
-          setWinner((current) => current || {
-            id: String(w.id ?? status.lastSpin.id ?? createClientId()),
-            name: w.Name || w.name,
-            phone: w.Phone || w.phone,
-            date: w.date || w.dob || w["Date of birth"],
-            occasion: w.occasion || w.Occasion || "Special Celebration",
-          });
+          setWinner(
+            (current) =>
+              current || {
+                id: String(w.id ?? status.lastSpin.id ?? createClientId()),
+                name: w.Name || w.name,
+                phone: w.Phone || w.phone,
+                date: w.date || w.dob || w["Date of birth"],
+                occasion: w.occasion || w.Occasion || "Special Celebration",
+              },
+          );
         }
-        setIncludeAllEntriesNextDraw(
-          status.includeAllEntriesNextDraw === true,
-        );
-        setIncludeAllThisMonthEntriesNextDraw(
-          status.includeAllThisMonthEntriesNextDraw === true,
-        );
         setEligibilityRules({
           annualEligibilityEnabled: status.annualEligibilityEnabled !== false,
           previousWinnerExclusionEnabled:
             status.previousWinnerExclusionEnabled !== false,
         });
+        if (status.nextDrawDate || status.drawDate) {
+          setNextDrawDate(status.nextDrawDate || status.drawDate);
+        }
         setEntries(normalizeDrawEntries(status.entries));
+        setDrawCountsByMonth(status.drawCountsByMonth || {});
+        setDrawCountYear(status.drawCountYear || new Date().getFullYear());
         setIsAdminStatusLoaded(true);
       })
       .catch((error) => {
@@ -126,21 +144,17 @@ function AdminLuckyDraw() {
         if (!isActive) return;
 
         setEntries(normalizeDrawEntries(status.entries));
-        setWheelEnabled(status.wheelEnabled);
-        if (typeof status.wheelEnabled === "boolean") {
-          setCustomerVisibilityDecision(status.wheelEnabled);
-        }
+        setDrawCountsByMonth(status.drawCountsByMonth || {});
+        setDrawCountYear(status.drawCountYear || new Date().getFullYear());
+        setWheelEnabled(status.wheelEnabled ?? true);
         const drawDone = Boolean(
           status.manualDrawCompleted || status.hasWinnerForCurrentCycle,
         );
         setManualDrawCompleted(drawDone);
         setHasWinnerForCurrentCycle(Boolean(status.hasWinnerForCurrentCycle));
-        setIncludeAllEntriesNextDraw(
-          status.includeAllEntriesNextDraw === true,
-        );
-        setIncludeAllThisMonthEntriesNextDraw(
-          status.includeAllThisMonthEntriesNextDraw === true,
-        );
+        if (status.nextDrawDate || status.drawDate) {
+          setNextDrawDate((curr) => curr || status.nextDrawDate || status.drawDate);
+        }
       } catch (error) {
         if (isActive) {
           handleAdminActionError(error, "Unable to refresh draw status");
@@ -180,29 +194,33 @@ function AdminLuckyDraw() {
       setAdminToken(result.token);
       window.localStorage.setItem("bnb-admin-token", result.token);
       setCredentials({ email: "", password: "" });
-      window.history.replaceState({}, "", "/admin");
+      navigate("/admin/spin-wheel", { replace: true });
     } catch (error) {
       setAdminError(error.message || "Unable to sign in as admin");
     }
   };
 
   const isCompletedOrHasWinner = Boolean(
-    manualDrawCompleted ||
-    hasWinnerForCurrentCycle ||
-    winner,
+    manualDrawCompleted || hasWinnerForCurrentCycle || winner,
+  );
+  const currentDrawMonthNumber = Number(
+    new Intl.DateTimeFormat("en", {
+      month: "2-digit",
+      timeZone: "Asia/Kolkata",
+    }).format(new Date()),
+  );
+  const selectedDrawMonthNumber = drawMonths.indexOf(selectedDrawMonth) + 1;
+  const entriesForSelectedMonth = entries.filter(
+    (entry) => getEntryMonth(entry) === selectedDrawMonthNumber,
   );
 
-  const handleSpin = async (options = {}) => {
-    const isRespin = Boolean(options?.isRespin || isCompletedOrHasWinner);
-
+  const handleSpin = async () => {
     if (
       !adminToken ||
       spinRequestInFlightRef.current ||
-      (!isRespin && customerVisibilityDecision === null) ||
-      isUpdatingVisibility ||
       isDrawing ||
       showWheelOverlay ||
-      !entries.length
+      !entriesForSelectedMonth.length
     ) {
       return;
     }
@@ -216,7 +234,10 @@ function AdminLuckyDraw() {
     let animationWillContinue = false;
 
     try {
-      const result = await spinLuckyDraw(adminToken, { respin: isRespin });
+      const result = await spinLuckyDraw(adminToken, {
+        respin: isCompletedOrHasWinner,
+        celebrationMonth: selectedDrawMonthNumber,
+      });
       setManualDrawCompleted(true);
       const winnerEntry = {
         id: String(result.winner.id ?? result.spinId ?? createClientId()),
@@ -233,22 +254,27 @@ function AdminLuckyDraw() {
       };
       setWinner(winnerEntry);
       try {
-        window.localStorage.setItem("bnb-lucky-draw-latest-winner", JSON.stringify(winnerEntry));
-      } catch {}
+        window.localStorage.setItem(
+          "bnb-lucky-draw-latest-winner",
+          JSON.stringify(winnerEntry),
+        );
+      } catch { }
       setWhatsappLink(result.whatsapp?.chatLink || "");
 
       try {
         const updatedStatus = await getLuckyDrawStatus();
         setEntries(normalizeDrawEntries(updatedStatus.entries));
-      } catch {}
+        setDrawCountsByMonth(updatedStatus.drawCountsByMonth || {});
+        setDrawCountYear(
+          updatedStatus.drawCountYear || new Date().getFullYear(),
+        );
+      } catch { }
 
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         setIsDrawing(false);
         setShowWheelOverlay(false);
         setShowWinnerPopup(true);
-        spinRequestInFlightRef.current = false;
-        setWheelEnabled(false);
-        setCustomerVisibilityDecision(false);
+        setWheelEnabled(true);
         return;
       }
 
@@ -275,8 +301,7 @@ function AdminLuckyDraw() {
         setShowWheelOverlay(false);
         setShowWinnerPopup(true);
         spinRequestInFlightRef.current = false;
-        setWheelEnabled(false);
-        setCustomerVisibilityDecision(false);
+        setWheelEnabled(true);
       }, 9000);
     } catch (error) {
       setIsDrawing(false);
@@ -290,94 +315,18 @@ function AdminLuckyDraw() {
     }
   };
 
-  const handleCustomerVisibilityDecision = async (enabled) => {
-    if (isUpdatingVisibility || isDrawing || isSpinRequestInFlight) {
-      return;
-    }
-    setIsUpdatingVisibility(true);
-    setAdminError("");
-    try {
-      const result = await setLuckyDrawVisibility(adminToken, enabled);
-      setWheelEnabled(result.wheelEnabled);
-      setCustomerVisibilityDecision(result.wheelEnabled);
-    } catch (error) {
-      handleAdminActionError(error, "Unable to update draw visibility");
-    } finally {
-      setIsUpdatingVisibility(false);
-    }
-  };
 
-  const handleEligibilityReset = async () => {
-    if (isUpdatingEligibilityReset || isDrawing || isSpinRequestInFlight) return;
-    setIsUpdatingEligibilityReset(true);
-    setAdminError("");
-    try {
-      const result = await setLuckyDrawIncludeAllEntriesNextDraw(
-        adminToken,
-        !includeAllEntriesNextDraw,
-      );
-      setIncludeAllEntriesNextDraw(result.includeAllEntriesNextDraw);
-      if (result.includeAllEntriesNextDraw) {
-        setIncludeAllThisMonthEntriesNextDraw(false);
-      }
-      try {
-        const status = await getLuckyDrawStatus();
-        setEntries(normalizeDrawEntries(status.entries));
-      } catch (error) {
-        setAdminError(
-          `Eligibility reset saved, but entries could not be refreshed: ${error.message}`,
-        );
-      }
-    } catch (error) {
-      handleAdminActionError(error, "Unable to update next-draw eligibility");
-    } finally {
-      setIsUpdatingEligibilityReset(false);
-    }
-  };
 
-  const handleIncludeThisMonthEntries = async () => {
-    if (isUpdatingMonthEntries || isDrawing || isSpinRequestInFlight) return;
-    setIsUpdatingMonthEntries(true);
-    setAdminError("");
-    try {
-      const result = await setLuckyDrawIncludeAllThisMonthEntriesNextDraw(
-        adminToken,
-        !includeAllThisMonthEntriesNextDraw,
-      );
-      setIncludeAllThisMonthEntriesNextDraw(
-        result.includeAllThisMonthEntriesNextDraw,
-      );
-      if (result.includeAllThisMonthEntriesNextDraw) {
-        setIncludeAllEntriesNextDraw(false);
-      }
-      try {
-        const status = await getLuckyDrawStatus();
-        setEntries(normalizeDrawEntries(status.entries));
-      } catch (error) {
-        setAdminError(
-          `Monthly entries option saved, but entries could not be refreshed: ${error.message}`,
-        );
-      }
-    } catch (error) {
-      handleAdminActionError(error, "Unable to update this month's entries");
-    } finally {
-      setIsUpdatingMonthEntries(false);
-    }
-  };
-
-  const handleEligibilityRuleChange = (field, value) => {
-    setEligibilityRules((current) => ({ ...current, [field]: value }));
-  };
-
-  const handleSaveEligibilityRules = async () => {
+  const handleSaveEligibilityRules = async (rulesToSave = eligibilityRules) => {
+    setEligibilityRules(rulesToSave);
     setIsSavingEligibilityRules(true);
     setAdminError("");
 
     try {
       const settings = await updateLuckyDrawFeatures(adminToken, {
-        annualEligibilityEnabled: eligibilityRules.annualEligibilityEnabled,
+        annualEligibilityEnabled: rulesToSave.annualEligibilityEnabled,
         previousWinnerExclusionEnabled:
-          eligibilityRules.previousWinnerExclusionEnabled,
+          rulesToSave.previousWinnerExclusionEnabled,
       });
       setEligibilityRules({
         annualEligibilityEnabled: settings.annualEligibilityEnabled !== false,
@@ -399,185 +348,32 @@ function AdminLuckyDraw() {
     }
   };
 
-  const renderSharedDrawOptions = () => (
-    <section className="admin-draw-common-options" aria-label="Shared draw options">
-      <div className="admin-draw-step">
-        <div className="admin-draw-step-heading">
-          <span>Step 1</span>
-          <h2>Eligibility rules <small>(Optional)</small></h2>
-        </div>
-        <fieldset
-          className="admin-feature-settings admin-eligibility-rules"
-          disabled={isSavingEligibilityRules || isDrawing || isSpinRequestInFlight}
-        >
-          <legend>Who can enter this draw?</legend>
-          <label className="admin-feature-toggle">
-            <span>
-              <strong>Annual entry eligibility</strong>
-              <small>
-                Limit each phone number to one eligible entry every 12 months.
-              </small>
-            </span>
-            <input
-              type="checkbox"
-              checked={eligibilityRules.annualEligibilityEnabled}
-              onChange={(event) =>
-                handleEligibilityRuleChange(
-                  "annualEligibilityEnabled",
-                  event.target.checked,
-                )
-              }
-            />
-          </label>
-          <label className="admin-feature-toggle">
-            <span>
-              <strong>Previous winner exclusion</strong>
-              <small>Exclude customers who won within the last 12 months.</small>
-            </span>
-            <input
-              type="checkbox"
-              checked={eligibilityRules.previousWinnerExclusionEnabled}
-              onChange={(event) =>
-                handleEligibilityRuleChange(
-                  "previousWinnerExclusionEnabled",
-                  event.target.checked,
-                )
-              }
-            />
-          </label>
-          <button
-            className="admin-save-draw-setup"
-            disabled={isSavingEligibilityRules || isDrawing || isSpinRequestInFlight}
-            onClick={handleSaveEligibilityRules}
-            type="button"
-          >
-            {isSavingEligibilityRules ? "Saving eligibility..." : "Save eligibility rules"}
-          </button>
-        </fieldset>
-      </div>
-
-      <div className="admin-draw-step">
-        <div className="admin-draw-step-heading">
-          <span>Step 2</span>
-          <h2>Entry overrides <small>(Optional)</small></h2>
-        </div>
-        <div className="admin-eligibility-reset">
-          <div>
-            <strong>
-              {includeAllEntriesNextDraw
-                ? "Next draw includes all registered customers"
-                : "Recent winners are excluded"}
-            </strong>
-            <small>
-              {includeAllEntriesNextDraw
-                ? "The one-time reset clears automatically after the next draw."
-                : "Include recent winners in the next draw only."}
-            </small>
-          </div>
-          <button
-            className="admin-eligibility-reset-button"
-            disabled={
-              isUpdatingEligibilityReset || isDrawing || isSpinRequestInFlight
-            }
-            onClick={handleEligibilityReset}
-            type="button"
-          >
-            {isUpdatingEligibilityReset
-              ? "Updating..."
-              : includeAllEntriesNextDraw
-                ? "Cancel next-draw reset"
-                : "Include everyone in next draw"}
-          </button>
-        </div>
-        <div className="admin-eligibility-reset">
-          <div>
-            <strong>
-              {includeAllThisMonthEntriesNextDraw
-                ? "This draw uses celebrations happening this month"
-                : "Include only this month's celebrations"}
-            </strong>
-            <small>
-              {includeAllThisMonthEntriesNextDraw
-                ? "One entry per customer with a celebration date this month, including recent winners."
-                : "Include customers with a celebration date this month, even if they are recent winners."}
-            </small>
-          </div>
-          <button
-            className="admin-eligibility-reset-button"
-            disabled={isUpdatingMonthEntries || isDrawing || isSpinRequestInFlight}
-            onClick={handleIncludeThisMonthEntries}
-            type="button"
-          >
-            {isUpdatingMonthEntries
-              ? "Updating..."
-              : includeAllThisMonthEntriesNextDraw
-                ? "Cancel this-month celebrations"
-                : "Include this month's celebrations"}
-          </button>
-        </div>
-      </div>
-
-      <div className="admin-draw-step">
-        <div className="admin-draw-step-heading">
-          <span>Step 3</span>
-          <h2>Customer visibility <small>(Mandatory)</small></h2>
-        </div>
-        <fieldset
-          className="admin-feature-settings admin-customer-visibility"
-          disabled={isUpdatingVisibility || isDrawing || isSpinRequestInFlight}
-        >
-          <legend>Enable the draw for customers?</legend>
-          <p>
-            Choose whether the lucky draw is visible on the customer site.
-          </p>
-          <label className="admin-feature-toggle">
-            <span>
-              <strong>Yes</strong>
-              <small>Make the draw visible to customers.</small>
-            </span>
-            <input
-              type="radio"
-              name="customer-draw-visibility"
-              value="yes"
-              checked={customerVisibilityDecision === true}
-              onChange={() => handleCustomerVisibilityDecision(true)}
-            />
-          </label>
-          <label className="admin-feature-toggle">
-            <span>
-              <strong>No</strong>
-              <small>Keep the draw hidden from customers.</small>
-            </span>
-            <input
-              type="radio"
-              name="customer-draw-visibility"
-              value="no"
-              checked={customerVisibilityDecision === false}
-              onChange={() => handleCustomerVisibilityDecision(false)}
-            />
-          </label>
-          <p className="admin-visibility-status" role="status">
-            <span
-              className={`status-dot ${wheelEnabled ? "is-live" : "is-hidden"}`}
-            ></span>
-            <span>
-              Current status:{" "}
-              <strong>
-                {wheelEnabled ? "Live for customers" : "Hidden from customers"}
-              </strong>
-            </span>
-          </p>
-        </fieldset>
-      </div>
-    </section>
-  );
+  const handleNextDrawDateChange = async (event) => {
+    const value = event.target.value;
+    setNextDrawDate(value);
+    setIsSavingNextDrawDate(true);
+    setNextDrawDateSaved(false);
+    try {
+      await updateLuckyDrawNextDrawDate(adminToken, value);
+      setNextDrawDateSaved(true);
+      window.setTimeout(() => setNextDrawDateSaved(false), 2500);
+    } catch (error) {
+      handleAdminActionError(error, "Unable to save next draw date");
+    } finally {
+      setIsSavingNextDrawDate(false);
+    }
+  };
 
   if (!adminToken) {
     return (
       <main className="admin-login-page">
         <form className="admin-login-card" onSubmit={handleAdminLogin}>
-          <a className="admin-login-brand" href="/" aria-label="Binge & Bliss home">
-            <img src="/landing_page/logo.jpg" alt="Binge & Bliss" />
+          <a
+            className="admin-login-brand"
+            href="/"
+            aria-label="Binge & Bliss home"
+          >
+            <img src={logoImg} alt="Binge & Bliss" />
             <span>Binge &amp; Bliss</span>
             <small>ADMIN PORTAL</small>
           </a>
@@ -631,18 +427,20 @@ function AdminLuckyDraw() {
     <main className="admin-shell">
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
-          <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
+          <img src={logoImg} alt="Binge N Bliss" />
           <span>BNB admin</span>
         </a>
         <nav className="admin-nav">
-          <a className="is-active" href="#spin-wheel">
+          <a className="is-active" href="/admin/spin-wheel">
             Spin wheel
           </a>
           <a href="/admin/occasions">Special occasions</a>
           <a href="/admin/customers">Customers</a>
           <AdminEnquiriesLink />
           <a href="/admin/winner-history">Winner history</a>
-          <a href="/lucky-draw">Customer site</a>
+          <a href="/lucky-draw" target="_blank" rel="noopener noreferrer">
+            Customer site
+          </a>
         </nav>
         {adminToken && (
           <button
@@ -659,46 +457,147 @@ function AdminLuckyDraw() {
       </aside>
       <section className="admin-main" id="admin-lucky-draw">
         <div className="admin-page-heading">
-          <span className="heading-tag">Monthly Draw</span>
-          <span className="heading-title">Choose a winner.</span>
-          <span className="heading-divider">•</span>
-          <span className="heading-sub">
-            Choose one winner from the saved customer entries.
-          </span>
+          <span className="heading-tag">Monthly Draw - Choose a winner.</span>
         </div>
         <div className="admin-draw-layout" id="spin-wheel">
           <div className="admin-draw-panel">
-            <span className="admin-access-title">
-              Admin draw control
-            </span>
-            <section className="admin-draw-tab-panel is-manual" id="draw-tab-panel">
-              {renderSharedDrawOptions()}
+            <section
+              className="admin-draw-tab-panel is-manual"
+              id="draw-tab-panel"
+            >
               <div className="admin-draw-step">
                 <div className="admin-draw-step-heading">
-                  <span>Step 4</span>
+                  <span>Step 1</span>
                   <h2>Manual spin</h2>
                 </div>
                 <section
                   className="admin-draw-widget is-unlocked"
                   aria-label="Lucky draw widget"
-                  aria-disabled={customerVisibilityDecision === null}
                 >
+                  <div className="admin-draw-controls-row">
+                    <label className="admin-draw-month-control">
+                      <span className="admin-draw-control-label">
+                        Draw month
+                      </span>
+                      <select
+                        value={selectedDrawMonth}
+                        onChange={(event) =>
+                          setSelectedDrawMonth(event.target.value)
+                        }
+                      >
+                        {drawMonths.map((month, monthIndex) => (
+                          <option
+                            key={month}
+                            value={month}
+                            disabled={monthIndex + 1 < currentDrawMonthNumber}
+                          >
+                            {month}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="admin-draw-control admin-next-draw-date-control">
+                      <span className="admin-draw-control-label">
+                        Next draw date
+                        {nextDrawDateSaved && (
+                          <span className="save-indicator">✓ Saved</span>
+                        )}
+                      </span>
+                      <input
+                        type="date"
+                        id="admin-next-draw-date"
+                        value={nextDrawDate}
+                        onChange={handleNextDrawDateChange}
+                        disabled={
+                          isSavingNextDrawDate ||
+                          isDrawing ||
+                          isSpinRequestInFlight
+                        }
+                        className="admin-next-draw-date-input"
+                        aria-label="Next draw date"
+                      />
+                    </div>
+                    <div className="admin-draw-control admin-previous-winner-control">
+                      <span className="admin-draw-control-label">
+                        Previous winners
+                      </span>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={
+                            eligibilityRules.previousWinnerExclusionEnabled
+                          }
+                          disabled={
+                            isSavingEligibilityRules ||
+                            isDrawing ||
+                            isSpinRequestInFlight
+                          }
+                          onChange={(event) =>
+                            void handleSaveEligibilityRules({
+                              ...eligibilityRules,
+                              previousWinnerExclusionEnabled:
+                                event.target.checked,
+                            })
+                          }
+                        />
+                        Exclude last 12 months
+                      </label>
+                    </div>
+                    <div className="admin-draw-control admin-draw-action-control">
+                      <span className="admin-draw-control-label">Draw</span>
+                      <button
+                        id="admin-start-spin-button"
+                        className={`draw-button ${isDrawing || isSpinRequestInFlight ? "is-running" : ""}`}
+                        disabled={
+                          isSpinRequestInFlight ||
+                          isDrawing ||
+                          !entriesForSelectedMonth.length
+                        }
+                        onClick={handleSpin}
+                        type="button"
+                      >
+                        <span>
+                          {isDrawing
+                            ? "Selecting Winner..."
+                            : isSpinRequestInFlight
+                              ? "Starting Draw..."
+                              : "Spin Wheel"}
+                        </span>
+                        <span className="btn-arrow">→</span>
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="lucky-draw-reveal-panel">
                     <span className="draw-reveal-kicker">
                       Manual Winner Selection
                     </span>
-                    <strong className={isDrawing ? "is-drawing" : ""}>
-                      {isDrawing
-                        ? "Selecting Winner..."
-                        : winner
-                          ? winner.name
-                          : "Ready when you are"}
-                    </strong>
+                    <div className="admin-winner-display-stack">
+                      <strong className={isDrawing ? "is-drawing" : ""}>
+                        {isDrawing
+                          ? "Selecting Winner..."
+                          : winner
+                            ? winner.name
+                            : "Ready when you are"}
+                      </strong>
+                      {Boolean(winner) && !isDrawing && (
+                        <button
+                          type="button"
+                          className="view-poster-glowing-btn admin-view-poster-btn"
+                          onClick={() => setShowWinnerPopup(true)}
+                          aria-label="View winner poster"
+                        >
+                          <span className="poster-label-full">View Winner Poster</span>
+                          <span className="poster-label-compact">Poster</span>
+                          <span className="btn-sparkle">✨ ↗</span>
+                        </button>
+                      )}
+                    </div>
                     <div
                       className="name-capsule-grid"
                       aria-label="Lucky draw customers"
                     >
-                      {entries.map((entry, index) => {
+                      {entriesForSelectedMonth.map((entry, index) => {
                         const displayName =
                           entry.name ?? entry.Name ?? "Unknown";
                         const isWinner =
@@ -723,98 +622,20 @@ function AdminLuckyDraw() {
                         );
                       })}
                     </div>
+                    {entriesForSelectedMonth.length === 0 && (
+                      <p className="admin-draw-empty-month" role="status">
+                        No eligible entries for {selectedDrawMonth}.
+                      </p>
+                    )}
                     <small>
-                      {entries.length} eligible entries in this month&apos;s draw
+                      {entriesForSelectedMonth.length} eligible entries for{" "}
+                      {selectedDrawMonth}
                     </small>
                   </div>
-                  <button
-                    id="admin-start-spin-button"
-                    className={`draw-button ${isDrawing || isSpinRequestInFlight ? "is-running" : ""}`}
-                    disabled={
-                      isCompletedOrHasWinner ||
-                      isSpinRequestInFlight ||
-                      customerVisibilityDecision === null ||
-                      isUpdatingVisibility ||
-                      isDrawing ||
-                      !entries.length
-                    }
-                    style={{
-                      pointerEvents:
-                        isCompletedOrHasWinner ||
-                        isSpinRequestInFlight ||
-                        customerVisibilityDecision === null ||
-                        isUpdatingVisibility ||
-                        isDrawing ||
-                        !entries.length
-                          ? "none"
-                          : "auto",
-                      opacity:
-                        isCompletedOrHasWinner ||
-                        isSpinRequestInFlight ||
-                        customerVisibilityDecision === null ||
-                        isUpdatingVisibility ||
-                        isDrawing ||
-                        !entries.length
-                          ? 0.7
-                          : 1,
-                      cursor:
-                        isCompletedOrHasWinner ||
-                        isSpinRequestInFlight ||
-                        customerVisibilityDecision === null ||
-                        isUpdatingVisibility ||
-                        isDrawing ||
-                        !entries.length
-                          ? "not-allowed"
-                          : "pointer",
-                    }}
-                    onClick={handleSpin}
-                    type="button"
-                  >
-                    <span>
-                      {isDrawing
-                        ? "Selecting Winner..."
-                        : isCompletedOrHasWinner
-                          ? "Draw Complete"
-                          : isSpinRequestInFlight
-                            ? "Starting Draw..."
-                            : customerVisibilityDecision === null
-                              ? "Choose Yes or No to continue"
-                              : "Start / Run the Draw"}
-                    </span>
-                    <span className="btn-arrow">→</span>
-                  </button>
-                  {isCompletedOrHasWinner && (
-                    <div className="admin-respin-container">
-                      <button
-                        id="admin-respin-button"
-                        className="admin-respin-button"
-                        onClick={() => handleSpin({ isRespin: true })}
-                        disabled={
-                          isDrawing ||
-                          isSpinRequestInFlight ||
-                          !entries.length
-                        }
-                        type="button"
-                      >
-                        <span className="respin-icon">🔄</span>
-                        <span>
-                          {isDrawing
-                            ? "Selecting New Winner..."
-                            : isSpinRequestInFlight
-                              ? "Starting Re-spin..."
-                              : "Re-spin (Choose Another Winner)"}
-                        </span>
-                        <span className="btn-arrow">→</span>
-                      </button>
-                      <p className="admin-respin-hint">
-                        💡 <strong>Re-spin option:</strong> Use if the winner is unavailable, for festival special draws, or testing. Selects another winner from remaining eligible entries.
-                      </p>
-                    </div>
-                  )}
-                  <p className="admin-redraw-note">
-                    One winner is selected per customer-visibility session.
-                    To start a new draw, turn customer visibility off and
-                    enable it again.
+                  <p className="admin-month-draw-count" role="status">
+                    {drawCountsByMonth[selectedDrawMonthNumber] || 0} draws in{" "}
+                    {selectedDrawMonth} {drawCountYear} so far (including
+                    re-spins)
                   </p>
                 </section>
               </div>
@@ -977,7 +798,7 @@ function AdminLuckyDraw() {
             {/* Poster Graphic with Text Overlays */}
             <div className="template-poster-wrapper">
               <img
-                src="/lucky_draw_registration/winner_card_template.png"
+                src={winnerCardTemplateImg}
                 alt="Winner Announcement Template"
                 className="template-poster-img"
               />
@@ -1050,18 +871,6 @@ function AdminLuckyDraw() {
                   Send WhatsApp Notification <span>↗</span>
                 </a>
               ) : null}
-              <button
-                id="admin-modal-respin-btn"
-                className="winner-respin-secondary-btn"
-                onClick={() => {
-                  setShowWinnerPopup(false);
-                  handleSpin({ isRespin: true });
-                }}
-                type="button"
-                disabled={isDrawing || isSpinRequestInFlight || !entries.length}
-              >
-                🔄 Re-spin (New Winner)
-              </button>
               <button
                 className="winner-claim-btn"
                 onClick={() => setShowWinnerPopup(false)}

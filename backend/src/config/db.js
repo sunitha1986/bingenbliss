@@ -10,21 +10,12 @@ const emptyStore = {
   users: [],
   orders: [],
   luckyDrawSettings: {
-    wheelEnabled: false,
+    wheelEnabled: true,
     annualEligibilityEnabled: true,
     includeAllEntriesNextDraw: false,
     includeAllThisMonthEntriesNextDraw: false,
     includeAllThisMonthEntriesMonth: "",
-    celebrationOccasions: [
-      "Birthday party",
-      "Anniversary",
-      "Kitty party",
-      "Private theatre",
-      "Mini theatre",
-      "Photography",
-      "Customize lucky draw",
-      "Other",
-    ],
+    celebrationOccasions: ["Birthday party", "Anniversary"],
   },
 };
 

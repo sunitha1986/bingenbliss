@@ -119,3 +119,23 @@ test("keeps the default one-entry-per-customer eligibility behavior", () => {
     ["Latest registration"],
   );
 });
+
+test("limits spin eligibility to the selected celebration month across years", () => {
+  const customers = [
+    { Name: "October entry", Phone: "9876543210", "Celebration date": "2026-10-03" },
+    { Name: "November entry", Phone: "9876543211", "Celebration date": "2026-11-03" },
+    { Name: "October last year", Phone: "9876543212", "Celebration date": "2025-10-03" },
+  ];
+
+  const entries = getEligibleLuckyDrawCustomers(
+    customers,
+    [],
+    false,
+    { celebrationMonth: 10 },
+  );
+
+  assert.deepEqual(
+    entries.map(({ Name }) => Name),
+    ["October entry", "October last year"],
+  );
+});

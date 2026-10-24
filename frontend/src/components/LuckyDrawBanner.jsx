@@ -69,7 +69,27 @@ function LuckyDrawBanner({
                     ✦
                   </span>
                 </span>
+
               ))}
+
+                <span className="banner-announcement-star" aria-hidden="true">✦</span>
+                <span>
+                  <strong>Next draw date:</strong> {banner?.nextDrawDate || "Date to be announced"}
+                </span>
+                <span className="banner-announcement-star" aria-hidden="true">✦</span>
+             
+              <span className="banner-announcement-copy" aria-hidden="true">
+                <span>
+                  <strong>Latest winner:</strong> {banner?.winnerName || "To be announced"}
+                  {banner?.winnerMonth && ` (${banner.winnerMonth})`}
+                </span>
+                <span className="banner-announcement-star">✦</span>
+                <span>
+                  <strong>Next draw date:</strong> {banner?.nextDrawDate || "Date to be announced"}
+                </span>
+                <span className="banner-announcement-star">✦</span>
+              </span>
+
             </div>
           </div>
 

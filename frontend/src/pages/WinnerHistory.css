@@ -1,6 +1,8 @@
 .winner-history-admin-shell {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
   background: #28112f;
   color: #fffafd;
 }
@@ -88,11 +90,14 @@
   min-width: 0;
   min-height: 100vh;
   padding: 78px max(5vw, 24px) 72px;
+  box-sizing: border-box;
 }
 
 .winner-history-content {
   margin: 0 auto;
   max-width: 850px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .winner-history-heading {
@@ -414,17 +419,35 @@
   margin-top: 14px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .winner-history-admin-shell {
+    flex-direction: column;
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
   .winner-history-admin-sidebar {
     align-items: center;
+    box-sizing: border-box;
     flex-basis: auto;
     flex-direction: row;
-    gap: 12px;
-    min-height: auto;
-    padding: 12px 14px;
+    gap: 10px;
+    height: auto;
+    min-height: 58px;
+    padding: 10px 14px;
+    position: sticky;
+    top: 0;
+    width: 100%;
+    z-index: 50;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 250, 253, 0.12);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    background: #1d1422;
   }
 
   .winner-history-admin-brand {
+    flex: 0 0 auto;
     justify-content: center;
     margin: 0;
   }
@@ -441,18 +464,24 @@
   .winner-history-admin-nav {
     display: flex;
     flex: 1;
-    gap: 2px;
+    gap: 4px;
     min-width: 0;
     overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .winner-history-admin-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .winner-history-admin-nav a {
     border-bottom: 2px solid transparent;
     border-left: 0;
-    border-radius: 3px 3px 0 0;
+    border-radius: 4px 4px 0 0;
     flex: 0 0 auto;
-    font-size: 10px;
-    padding: 10px 7px;
+    font-size: 11px;
+    padding: 9px 8px;
     white-space: nowrap;
   }
 
@@ -463,50 +492,183 @@
   }
 
   .winner-history-admin-signout {
-    font-size: 10px;
+    flex: 0 0 auto;
+    font-size: 11px;
     margin: 0;
-    padding: 8px;
+    padding: 8px 10px;
     white-space: nowrap;
   }
 
   .winner-history-page {
-    padding: 44px 14px 48px;
+    box-sizing: border-box;
+    min-height: auto;
+    padding: 24px 14px 48px;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .winner-history-content {
+    width: 100%;
   }
 
   .winner-history-heading {
-    margin-bottom: 32px;
+    margin: 0 auto 22px;
+  }
+
+  .winner-history-heading h1 {
+    font-size: clamp(26px, 7vw, 36px);
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+
+  .winner-history-heading > p:last-child {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .winner-history-kicker {
+    font-size: 10px;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
   }
 
   .winner-history-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-bottom: 20px;
+    gap: 10px;
+    margin-bottom: 18px;
   }
 
   .winner-history-stat {
-    padding: 14px;
+    padding: 12px 14px;
+    gap: 6px;
+  }
+
+  .winner-history-stat strong {
+    font-size: 22px;
   }
 
   .winner-history-latest-stat {
     grid-column: 1 / -1;
   }
 
+  .winner-history-latest-stat strong {
+    font-size: 16px;
+  }
+
   .winner-history-tools {
     grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .winner-history-search,
+  .winner-history-filter {
+    min-height: 46px;
+    padding: 0 12px;
+  }
+
+  .winner-history-search input,
+  .winner-history-filter select {
+    font-size: 14px;
   }
 
   .winner-history-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "rank date"
+      "person person";
     gap: 10px;
-    grid-template-columns: 28px minmax(0, 1fr);
-    padding: 14px;
+    min-height: auto;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border-left-width: 4px;
+  }
+
+  .winner-history-rank {
+    grid-area: rank;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+    justify-self: start;
+    background: rgba(217, 38, 169, 0.12);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .winner-history-rank span {
+    font-size: 8px;
+    letter-spacing: 0.5px;
   }
 
   .winner-history-date {
-    grid-column: 2;
-    text-align: left;
+    grid-area: date;
+    justify-self: end;
+    text-align: right;
     white-space: normal;
+    gap: 2px;
   }
 
   .winner-history-date span {
     font-size: 9px;
   }
+
+  .winner-history-person {
+    grid-area: person;
+    min-width: 0;
+  }
+
+  .winner-history-person h2 {
+    font-size: 16px;
+    margin-bottom: 3px;
+  }
+
+  .winner-history-person p {
+    font-size: 12px;
+  }
+
+  .winner-history-person .winner-history-event-date {
+    margin-top: 6px;
+    font-size: 11px;
+  }
+
+  .winner-history-message {
+    padding: 22px 16px;
+  }
+
+  .winner-history-message h2 {
+    font-size: 20px;
+  }
 }
+
+@media (max-width: 440px) {
+  .winner-history-page {
+    padding: 18px 10px 36px;
+  }
+
+  .winner-history-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .winner-history-stat {
+    padding: 12px;
+  }
+
+  .winner-history-item {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "rank"
+      "person"
+      "date";
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .winner-history-date {
+    justify-self: start;
+    text-align: left;
+  }
+}
+

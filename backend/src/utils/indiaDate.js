@@ -23,6 +23,23 @@ export function getIndiaDrawCycle(date = new Date()) {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
+export function getIndiaDrawCountsByMonth(spins, now = new Date()) {
+  const { year } = getIndiaDateParts(now);
+  const counts = {};
+
+  for (const spin of spins) {
+    const spunAt = new Date(spin?.spunAt || "");
+    if (!Number.isFinite(spunAt.getTime())) continue;
+
+    const parts = getIndiaDateParts(spunAt);
+    if (parts.year === year) {
+      counts[parts.month] = (counts[parts.month] || 0) + 1;
+    }
+  }
+
+  return { year, counts };
+}
+
 export function getIndiaDrawDate(date = new Date()) {
   const { year, month, day } = getIndiaDateParts(date);
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;

@@ -2,8 +2,10 @@ import config from "../config.js";
 
 async function request(path, options) {
   let response;
+  const baseUrl = (config.API_BASE_URL || "").replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   try {
-    response = await fetch(`${config.API_BASE_URL}${path}`, options);
+    response = await fetch(`${baseUrl}${normalizedPath}`, options);
   } catch {
     throw new Error(
       "Unable to reach the backend. Start the backend server and try again.",
@@ -167,12 +169,23 @@ export function updateLuckyDrawFeatures(token, settings) {
 
 export function updateLuckyDrawOccasions(token, celebrationOccasions) {
   return request("/api/admin/lucky-draw/occasions", {
-    method: "PATCH",
+    method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ celebrationOccasions }),
+  });
+}
+
+export function updateLuckyDrawNextDrawDate(token, nextDrawDate) {
+  return request("/api/admin/lucky-draw/next-draw-date", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ nextDrawDate }),
   });
 }
 
