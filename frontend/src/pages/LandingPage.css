@@ -81,23 +81,6 @@
     box-shadow 0.2s ease,
     transform 0.2s ease;
 }
-.experience-card::after {
-  background: linear-gradient(180deg, #f7bfd8 0%, #9ad8ff 100%);
-  border-radius: 999px;
-  box-shadow: 0 0 16px rgba(122, 140, 255, 0.5);
-  content: "";
-  height: calc(100% - 18px);
-  opacity: 0;
-  position: absolute;
-  right: -10px;
-  top: 9px;
-  transform: scaleY(0);
-  transform-origin: top center;
-  transition:
-    opacity 0.22s ease,
-    transform 0.22s ease;
-  width: 2px;
-}
 .service-reveal-card {
   opacity: 0;
   transform: translateY(32px);
@@ -110,10 +93,6 @@
 .service-reveal-card.is-visible {
   opacity: 1;
   transform: translateY(0);
-}
-.service-reveal-card.is-visible::after {
-  opacity: 1;
-  transform: scaleY(1);
 }
 .experience-card:hover {
   box-shadow: 0 12px 26px rgba(44, 29, 51, 0.12);
@@ -2482,4 +2461,3 @@
     grid-template-columns: 1fr;
   }
 }
-

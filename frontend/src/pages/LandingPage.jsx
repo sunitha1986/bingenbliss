@@ -87,6 +87,7 @@ const sampleReviews = [
     text: "Friendly service and lovely arrangements. They made planning our special occasion easy and memorable.",
   },
 ];
+const sampleReviewNames = ["Kishor", "Naveen", "Gagan"];
 const celebrationExperiences = [
   {
     title: "BirthBliss",
@@ -954,7 +955,7 @@ function LandingPage() {
                   {index + 1}
                 </span>
                 <div className="customer-review-author">
-                  <strong>Sample customer</strong>
+                  <strong>{sampleReviewNames[index]}</strong>
                   <span>Preview only</span>
                 </div>
               </div>

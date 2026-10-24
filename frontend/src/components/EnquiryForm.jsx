@@ -1,12 +1,41 @@
 import { useState } from "react";
 import "./Enquiryform.css";
 
+const weekdayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function getLocalDateValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getMonthStart(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function parseLocalDate(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatEventDate(value) {
+  return parseLocalDate(value).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 function EnquiryForm({
   triggerLabel = "Enquiry Form",
   triggerClassName = "lucky-draw-nav-button",
   onOpen,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const minimumEventDate = getLocalDateValue();
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => getMonthStart());
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -15,13 +44,52 @@ function EnquiryForm({
     guests: "",
     requirements: "",
   });
+  const currentMonth = getMonthStart();
+  const daysInVisibleMonth = new Date(
+    visibleMonth.getFullYear(),
+    visibleMonth.getMonth() + 1,
+    0,
+  ).getDate();
+  const firstWeekday = visibleMonth.getDay();
+  const monthLabel = visibleMonth.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+  const previousMonth = new Date(
+    visibleMonth.getFullYear(),
+    visibleMonth.getMonth() - 1,
+    1,
+  );
+  const canGoToPreviousMonth = previousMonth >= currentMonth;
+  const calendarDays = Array.from(
+    { length: daysInVisibleMonth },
+    (_, index) => {
+      const day = index + 1;
+      const date = new Date(
+        visibleMonth.getFullYear(),
+        visibleMonth.getMonth(),
+        day,
+      );
+      return {
+        date,
+        day,
+        dateValue: getLocalDateValue(date),
+      };
+    },
+  );
 
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [message, setMessage] = useState("");
 
   function updateField(event) {
     const { name, value } = event.target;
+    if (name === "eventDate" && value && value < minimumEventDate) {
+      setForm((previous) => ({ ...previous, eventDate: "" }));
+      setMessage("Please choose today or a future event date.");
+      return;
+    }
     setForm((previous) => ({ ...previous, [name]: value }));
+    setMessage("");
   }
 
   function closeForm() {
@@ -31,6 +99,11 @@ function EnquiryForm({
 
   async function handleSubmit(event) {
   event.preventDefault();
+
+  if (form.eventDate && form.eventDate < minimumEventDate) {
+    setMessage("Please choose today or a future event date.");
+    return;
+  }
 
   try {
     setMessage("Submitting enquiry...");
@@ -82,6 +155,13 @@ setMessage("");
         type="button"
         className={triggerClassName}
         onClick={() => {
+          setForm((previous) => ({
+            ...previous,
+            eventDate:
+              previous.eventDate && previous.eventDate < minimumEventDate
+                ? ""
+                : previous.eventDate,
+          }));
           setIsOpen(true);
           onOpen?.();
         }}
@@ -154,12 +234,123 @@ setMessage("");
 
               <label>
                 Event Date
-                <input
-                  name="eventDate"
-                  type="date"
-                  value={form.eventDate}
-                  onChange={updateField}
-                />
+                <div className="enquiry-date-picker">
+                  <button
+                    aria-controls="enquiry-event-date-calendar"
+                    aria-expanded={isDatePickerOpen}
+                    className="enquiry-date-trigger"
+                    onClick={() => {
+                      const selectedDate =
+                        form.eventDate && form.eventDate >= minimumEventDate
+                          ? parseLocalDate(form.eventDate)
+                          : new Date();
+                      setVisibleMonth(getMonthStart(selectedDate));
+                      setIsDatePickerOpen((isVisible) => !isVisible);
+                    }}
+                    type="button"
+                  >
+                    {form.eventDate
+                      ? formatEventDate(form.eventDate)
+                      : "Choose an upcoming date"}
+                  </button>
+                  {isDatePickerOpen && (
+                    <div
+                      className="enquiry-date-calendar"
+                      id="enquiry-event-date-calendar"
+                      role="group"
+                      aria-label="Choose an event date"
+                    >
+                      <div className="enquiry-date-calendar-header">
+                        <button
+                          aria-label="Previous month"
+                          disabled={!canGoToPreviousMonth}
+                          onClick={() =>
+                            setVisibleMonth(previousMonth)
+                          }
+                          type="button"
+                        >
+                          ‹
+                        </button>
+                        <strong>{monthLabel}</strong>
+                        <button
+                          aria-label="Next month"
+                          onClick={() =>
+                            setVisibleMonth(
+                              new Date(
+                                visibleMonth.getFullYear(),
+                                visibleMonth.getMonth() + 1,
+                                1,
+                              ),
+                            )
+                          }
+                          type="button"
+                        >
+                          ›
+                        </button>
+                      </div>
+                      <div
+                        className="enquiry-date-calendar-grid"
+                        role="grid"
+                        aria-label={monthLabel}
+                      >
+                        {weekdayLabels.map((weekday) => (
+                          <span
+                            className="enquiry-date-weekday"
+                            key={weekday}
+                            role="columnheader"
+                          >
+                            {weekday}
+                          </span>
+                        ))}
+                        {Array.from({ length: firstWeekday }, (_, index) => (
+                          <span
+                            aria-hidden="true"
+                            className="enquiry-date-empty"
+                            key={`empty-${index}`}
+                          />
+                        ))}
+                        {calendarDays.map(({ date, day, dateValue }) =>
+                          dateValue < minimumEventDate ? (
+                            <span
+                              aria-hidden="true"
+                              className="enquiry-date-empty"
+                              key={dateValue}
+                            />
+                          ) : (
+                            <button
+                              aria-label={date.toLocaleDateString(undefined, {
+                                dateStyle: "full",
+                              })}
+                              aria-pressed={form.eventDate === dateValue}
+                              className={
+                                form.eventDate === dateValue
+                                  ? "is-selected"
+                                  : undefined
+                              }
+                              key={dateValue}
+                              onClick={() => {
+                                setForm((previous) => ({
+                                  ...previous,
+                                  eventDate: dateValue,
+                                }));
+                                setMessage("");
+                                setIsDatePickerOpen(false);
+                              }}
+                              type="button"
+                            >
+                              {day}
+                            </button>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <input
+                    name="eventDate"
+                    type="hidden"
+                    value={form.eventDate}
+                  />
+                </div>
               </label>
 
               <label>

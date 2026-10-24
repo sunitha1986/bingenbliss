@@ -1,6 +1,6 @@
 import { useState } from "react";
 import LuckyDrawBanner from "./LuckyDrawBanner";
-import EnquiryForm from "./Enquiryform";
+import EnquiryForm from "./EnquiryForm.jsx";
 import logoImg from "../assets/landing_page/logo.jpg";
 
 function Navbar({

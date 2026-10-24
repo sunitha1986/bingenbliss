@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useScrollLoadedCount } from "../hooks/useScrollLoadedCount";
 import { getLuckyDrawStatus, getLuckyDrawWinners } from "../services/api";
 import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
+import AdminBackButton from "../components/AdminBackButton";
 import "../App.css";
 import "./WinnerHistory.css";
 import logoImg from "../assets/landing_page/logo.jpg";
@@ -167,14 +168,17 @@ function WinnerHistory() {
         className="winner-history-admin-sidebar"
         aria-label="Admin navigation"
       >
-        <a
-          className="winner-history-admin-brand"
-          href="/"
-          aria-label="Binge N Bliss admin home"
-        >
-          <img src={logoImg} alt="" />
-          <span>BNB admin</span>
-        </a>
+        <div className="admin-sidebar-brand-row">
+          <AdminBackButton />
+          <a
+            className="winner-history-admin-brand"
+            href="/"
+            aria-label="Binge N Bliss admin home"
+          >
+            <img src={logoImg} alt="" />
+            <span>BNB admin</span>
+          </a>
+        </div>
         <nav className="winner-history-admin-nav">
           <a href="/admin">Spin draw</a>
           <a href="/admin/occasions">Special occasions</a>
@@ -186,9 +190,6 @@ function WinnerHistory() {
             aria-current="page"
           >
             Winner history
-          </a>
-          <a href="/lucky-draw" target="_blank" rel="noopener noreferrer">
-            Customer site
           </a>
         </nav>
         <button

@@ -8,6 +8,8 @@ import {
   updateLuckyDrawNextDrawDate,
 } from "../services/api";
 import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
+import AdminBackButton from "../components/AdminBackButton";
+import Modal from "../components/Modal";
 import { createClientId } from "../utils/createClientId";
 import "../App.css";
 import "./LuckyDraw.css";
@@ -66,6 +68,7 @@ function AdminLuckyDraw() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSpinRequestInFlight, setIsSpinRequestInFlight] = useState(false);
   const spinRequestInFlightRef = useRef(false);
+  const [showSpinConfirmation, setShowSpinConfirmation] = useState(false);
   const [showWheelOverlay, setShowWheelOverlay] = useState(false);
   const [winner, setWinner] = useState(null);
   const [showWinnerPopup, setShowWinnerPopup] = useState(false);
@@ -426,10 +429,13 @@ function AdminLuckyDraw() {
   return (
     <main className="admin-shell">
       <aside className="admin-sidebar" aria-label="Admin navigation">
-        <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
-          <img src={logoImg} alt="Binge N Bliss" />
-          <span>BNB admin</span>
-        </a>
+        <div className="admin-sidebar-brand-row">
+          <AdminBackButton />
+          <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
+            <img src={logoImg} alt="Binge N Bliss" />
+            <span>BNB admin</span>
+          </a>
+        </div>
         <nav className="admin-nav">
           <a className="is-active" href="/admin/spin-wheel">
             Spin wheel
@@ -438,9 +444,6 @@ function AdminLuckyDraw() {
           <a href="/admin/customers">Customers</a>
           <AdminEnquiriesLink />
           <a href="/admin/winner-history">Winner history</a>
-          <a href="/lucky-draw" target="_blank" rel="noopener noreferrer">
-            Customer site
-          </a>
         </nav>
         {adminToken && (
           <button
@@ -553,7 +556,7 @@ function AdminLuckyDraw() {
                           isDrawing ||
                           !entriesForSelectedMonth.length
                         }
-                        onClick={handleSpin}
+                        onClick={() => setShowSpinConfirmation(true)}
                         type="button"
                       >
                         <span>
@@ -649,6 +652,39 @@ function AdminLuckyDraw() {
         </div>
       </section>
       {/* Full Screen Spinning Wheel Overlay Blocking Screen */}
+      {showSpinConfirmation && (
+        <Modal
+          className="admin-spin-confirm-modal"
+          ariaLabelledby="admin-spin-confirm-title"
+          onClose={() => setShowSpinConfirmation(false)}
+        >
+          <p className="admin-spin-confirm-kicker">Monthly draw</p>
+          <h2 id="admin-spin-confirm-title">Start the spin wheel?</h2>
+          <p className="admin-spin-confirm-copy">
+            This will select a winner from the eligible entries for{" "}
+            {selectedDrawMonth}. Do you want to continue?
+          </p>
+          <div className="admin-spin-confirm-actions">
+            <button
+              className="admin-spin-confirm-cancel"
+              onClick={() => setShowSpinConfirmation(false)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="admin-spin-confirm-continue"
+              onClick={() => {
+                setShowSpinConfirmation(false);
+                void handleSpin();
+              }}
+              type="button"
+            >
+              Spin wheel
+            </button>
+          </div>
+        </Modal>
+      )}
       {showWheelOverlay && (
         <div
           className="spinning-wheel-full-overlay"

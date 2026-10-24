@@ -4,6 +4,7 @@ import {
   updateAdminEnquiryStatus,
 } from "../services/api";
 import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
+import AdminBackButton from "../components/AdminBackButton";
 import "../App.css";
 
 const enquiryStatuses = ["New", "Contacted", "Converted", "Closed"];
@@ -108,17 +109,19 @@ function AdminEnquiries() {
   return (
     <main className="admin-shell">
       <aside className="admin-sidebar" aria-label="Admin navigation">
-        <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
-          <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
-          <span>BNB admin</span>
-        </a>
+        <div className="admin-sidebar-brand-row">
+          <AdminBackButton />
+          <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
+            <img src="/landing_page/logo.jpg" alt="Binge N Bliss" />
+            <span>BNB admin</span>
+          </a>
+        </div>
         <nav className="admin-nav">
           <a href="/admin">Spin wheel</a>
           <a href="/admin/occasions">Special occasions</a>
           <a href="/admin/customers">Customers</a>
           <AdminEnquiriesLink active />
           <a href="/admin/winner-history">Winner history</a>
-          <a href="/lucky-draw">Customer site</a>
         </nav>
         <button
           className="admin-signout"

@@ -1,4 +1,9 @@
-function Modal({ children, onClose, className = "modal-card" }) {
+function Modal({
+  children,
+  onClose,
+  className = "modal-card",
+  ariaLabelledby,
+}) {
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
       <div
@@ -6,6 +11,7 @@ function Modal({ children, onClose, className = "modal-card" }) {
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={ariaLabelledby}
       >
         <button
           className="modal-close"

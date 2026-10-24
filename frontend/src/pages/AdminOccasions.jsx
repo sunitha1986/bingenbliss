@@ -4,6 +4,7 @@ import {
   updateLuckyDrawOccasions,
 } from "../services/api";
 import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
+import AdminBackButton from "../components/AdminBackButton";
 import "../App.css";
 import "./LuckyDraw.css";
 import logoImg from "../assets/landing_page/logo.jpg";
@@ -140,10 +141,13 @@ function AdminOccasions() {
   return (
     <main className="admin-shell">
       <aside className="admin-sidebar" aria-label="Admin navigation">
-        <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
-          <img src={logoImg} alt="Binge N Bliss" />
-          <span>BNB admin</span>
-        </a>
+        <div className="admin-sidebar-brand-row">
+          <AdminBackButton />
+          <a className="admin-brand" href="/" aria-label="Binge N Bliss home">
+            <img src={logoImg} alt="Binge N Bliss" />
+            <span>BNB admin</span>
+          </a>
+        </div>
         <nav className="admin-nav">
           <a href="/admin">Spin wheel</a>
           <a
@@ -156,9 +160,6 @@ function AdminOccasions() {
           <a href="/admin/customers">Customers</a>
           <AdminEnquiriesLink />
           <a href="/admin/winner-history">Winner history</a>
-          <a href="/lucky-draw" target="_blank" rel="noopener noreferrer">
-            Customer site
-          </a>
         </nav>
         <button
           className="admin-signout"

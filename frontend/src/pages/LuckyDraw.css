@@ -2,6 +2,85 @@
    Lucky Draw Page & Registration Styles
    ========================================================================== */
 
+.admin-spin-confirm-modal {
+  background: #fffafd;
+  border: 1px solid rgba(101, 42, 105, 0.14);
+  border-radius: 16px;
+  color: #28112f;
+  max-width: 420px;
+  padding: 34px;
+}
+
+.admin-spin-confirm-modal .modal-close {
+  color: #69566d;
+}
+
+.admin-spin-confirm-kicker {
+  color: #a14391;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.admin-spin-confirm-modal h2 {
+  color: #28112f;
+  font-size: 23px;
+  margin: 0 28px 10px 0;
+}
+
+.admin-spin-confirm-copy {
+  color: #675b69;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.admin-spin-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 26px;
+}
+
+.admin-spin-confirm-actions button {
+  align-items: center;
+  border-radius: 7px;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 18px;
+}
+
+.admin-spin-confirm-cancel {
+  background: #fff;
+  border: 1px solid #d9ccdc;
+  color: #49364d;
+}
+
+.admin-spin-confirm-cancel:hover {
+  background: #f7f0f7;
+}
+
+.admin-spin-confirm-continue {
+  background: #852b78;
+  border: 0;
+  color: #fff;
+}
+
+.admin-spin-confirm-continue:hover {
+  background: #6c1f62;
+}
+
+@media (max-width: 480px) {
+  .admin-spin-confirm-modal {
+    padding: 30px 24px;
+  }
+}
+
 .lucky-draw-section {
   background: #f7c9b3;
   color: var(--ink);
