@@ -5,6 +5,7 @@ import {
   getLuckyDrawStatus,
   updateAdminCustomer,
 } from "../services/api";
+import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
 import { createCustomerWorkbook } from "../utils/customerWorkbook.js";
 import "../App.css";
 
@@ -302,6 +303,7 @@ function AdminCustomers() {
           <a className="is-active" href="/admin/customers">
             Customers
           </a>
+          <AdminEnquiriesLink />
           <a href="/admin/winner-history">Winner history</a>
           <a href="/lucky-draw">Customer site</a>
         </nav>

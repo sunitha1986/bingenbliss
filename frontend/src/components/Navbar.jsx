@@ -1,5 +1,6 @@
 import { useState } from "react";
 import LuckyDrawBanner from "./LuckyDrawBanner";
+import EnquiryForm from "./Enquiryform";
 
 function Navbar({
   user,
@@ -9,6 +10,7 @@ function Navbar({
   luckyDrawBanner = null,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
 
   return (
     <>
@@ -32,39 +34,40 @@ function Navbar({
         </button>
 
         <div className={`nav-links ${menuOpen ? "open" : ""}`}>
-          <a href={standalone ? "/" : "#top"} onClick={() => setMenuOpen(false)}>
+          <a href={standalone ? "/" : "#top"} onClick={closeMenu}>
             Home
           </a>
+
           {!standalone && (
-            <a href="#events" onClick={() => setMenuOpen(false)}>
+            <a href="#events" onClick={closeMenu}>
               Events
             </a>
           )}
+
           {!standalone && (
-            <a href="#gallery" onClick={() => setMenuOpen(false)}>
+            <a href="#gallery" onClick={closeMenu}>
               Gallery
             </a>
           )}
+
           {!standalone && (
-            <a href="#contact" onClick={() => setMenuOpen(false)}>
+            <a href="#contact" onClick={closeMenu}>
               Contact
             </a>
           )}
-          <a
-            className="lucky-draw-nav-button"
-            href="/lucky-draw"
-            onClick={() => setMenuOpen(false)}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            LuckyDraw
-          </a>
+
+          <EnquiryForm
+            triggerLabel="Enquiry Form"
+            triggerClassName="lucky-draw-nav-button"
+            onOpen={closeMenu}
+          />
+
           {!standalone &&
             (user ? (
               <button
                 className="account-button"
                 onClick={() => {
-                  setMenuOpen(false);
+                  closeMenu();
                   onLogout?.();
                 }}
                 type="button"
@@ -75,7 +78,7 @@ function Navbar({
               <button
                 className="account-button"
                 onClick={() => {
-                  setMenuOpen(false);
+                  closeMenu();
                   onLogin?.();
                 }}
                 type="button"
@@ -86,7 +89,6 @@ function Navbar({
         </div>
       </nav>
     </>
-
   );
 }
 

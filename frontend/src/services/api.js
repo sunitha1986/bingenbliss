@@ -182,6 +182,23 @@ export function getAdminCustomers(token) {
   });
 }
 
+export function getAdminEnquiries(token) {
+  return request("/api/enquiries", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function updateAdminEnquiryStatus(token, enquiryId, status) {
+  return request(`/api/enquiries/${enquiryId}/status`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status }),
+  });
+}
+
 export function updateAdminCustomer(token, customerId, customer) {
   return request(`/api/admin/customers/${customerId}`, {
     method: "PUT",

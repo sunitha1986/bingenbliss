@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useScrollLoadedCount } from "../hooks/useScrollLoadedCount";
 import { getLuckyDrawStatus, getLuckyDrawWinners } from "../services/api";
+import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
 import "../App.css";
 import "./WinnerHistory.css";
 
@@ -177,6 +178,7 @@ function WinnerHistory() {
           <a href="/admin">Spin draw</a>
           <a href="/admin/occasions">Special occasions</a>
           <a href="/admin/customers">Customers</a>
+          <AdminEnquiriesLink />
           <a
             className="is-active"
             href="/admin/winner-history"

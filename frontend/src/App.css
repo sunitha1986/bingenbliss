@@ -92,6 +92,123 @@ button {
   color: #fff;
   outline: none;
 }
+.admin-nav a.admin-enquiries-link {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.admin-nav a.admin-enquiries-link.has-new {
+  background: rgba(207, 39, 85, 0.18);
+  border-left-color: #ff718e;
+  color: #fff;
+}
+.admin-enquiries-badge {
+  align-items: center;
+  background: #d93458;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 20px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.admin-enquiries-link.has-error .admin-enquiries-badge {
+  background: #a83a27;
+  min-width: 20px;
+}
+.admin-enquiries-bell {
+  align-items: center;
+  color: #dbcadd;
+  display: inline-flex;
+  flex: 0 0 28px;
+  height: 28px;
+  justify-content: center;
+  overflow: visible;
+  position: relative;
+  width: 28px;
+}
+.admin-enquiries-bell::before {
+  border: 2px solid #ff718e;
+  border-radius: 50%;
+  content: "";
+  inset: 2px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+.admin-enquiries-bell svg {
+  height: 21px;
+  position: relative;
+  width: 21px;
+  z-index: 1;
+}
+.admin-enquiries-link.has-new .admin-enquiries-bell {
+  color: #ff8ba1;
+}
+.admin-enquiries-dot {
+  background: #ff536f;
+  border: 2px solid #35143c;
+  border-radius: 50%;
+  height: 9px;
+  position: absolute;
+  right: 1px;
+  top: 2px;
+  width: 9px;
+}
+.admin-enquiries-link.is-ringing .admin-enquiries-bell svg {
+  animation: admin-enquiries-ring 0.9s ease-in-out infinite;
+  transform-origin: 50% 15%;
+}
+.admin-enquiries-link.is-ringing .admin-enquiries-bell::before {
+  animation: admin-enquiries-pulse 1.2s ease-out infinite;
+}
+.admin-enquiries-bell .admin-enquiries-dot {
+  z-index: 2;
+}
+@keyframes admin-enquiries-ring {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  15%,
+  45%,
+  75% {
+    transform: rotate(14deg);
+  }
+  30%,
+  60%,
+  90% {
+    transform: rotate(-14deg);
+  }
+}
+@keyframes admin-enquiries-pulse {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.75);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-enquiries-link.is-ringing .admin-enquiries-bell svg,
+  .admin-enquiries-link.is-ringing .admin-enquiries-bell::before {
+    animation: none;
+  }
+  .admin-enquiries-link.is-ringing .admin-enquiries-bell::before {
+    border-color: #ff718e;
+    opacity: 0.85;
+    transform: scale(1);
+  }
+}
 .admin-signout {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(240, 166, 220, 0.38);
@@ -447,6 +564,40 @@ button {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.admin-enquiry-status {
+  background: #f4edf5;
+  border: 1px solid #e1d1e4;
+  border-radius: 999px;
+  color: #4e3452;
+  font-size: 11px;
+  font-weight: 700;
+  max-width: 130px;
+  padding: 7px 10px;
+}
+.admin-enquiry-status.status-new {
+  background: #fff0f2;
+  border-color: #f5c1ca;
+  color: #a82543;
+}
+.admin-enquiry-status.status-contacted {
+  background: #fff7e7;
+  border-color: #eed9a7;
+  color: #795b19;
+}
+.admin-enquiry-status.status-converted {
+  background: #eaf7ef;
+  border-color: #bde4ca;
+  color: #23653b;
+}
+.admin-enquiry-status.status-closed {
+  background: #f0eef2;
+  border-color: #d8d2dc;
+  color: #625a67;
+}
+.admin-enquiry-status:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
 .admin-customer-guests {
   align-items: center;
   background: #f2e9f3;
@@ -760,6 +911,7 @@ button {
   white-space: nowrap;
 }
 .nav-links {
+  align-items: center;
   display: flex;
   font-family: "Montserrat", sans-serif;
   font-size: 14px;
@@ -768,7 +920,10 @@ button {
   margin-left: auto;
 }
 .nav-links a {
+  align-items: center;
   color: #fffaf4;
+  display: inline-flex;
+  line-height: 1;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.32);
   transition:
     color 0.2s ease,

@@ -8,6 +8,7 @@ import {
   spinLuckyDraw,
   updateLuckyDrawFeatures,
 } from "../services/api";
+import AdminEnquiriesLink from "../components/AdminEnquiriesLink";
 import { createClientId } from "../utils/createClientId";
 import "../App.css";
 import "./LuckyDraw.css";
@@ -639,6 +640,7 @@ function AdminLuckyDraw() {
           </a>
           <a href="/admin/occasions">Special occasions</a>
           <a href="/admin/customers">Customers</a>
+          <AdminEnquiriesLink />
           <a href="/admin/winner-history">Winner history</a>
           <a href="/lucky-draw">Customer site</a>
         </nav>

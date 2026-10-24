@@ -3,6 +3,7 @@ import LandingPage from "./pages/LandingPage";
 import FloatingContactActions from "./components/FloatingContactActions";
 import AdminLuckyDraw from "./pages/AdminLuckyDraw";
 import AdminCustomers from "./pages/AdminCustomers";
+import AdminEnquiries from "./pages/AdminEnquiries";
 import AdminOccasions from "./pages/AdminOccasions";
 import LuckyDraw from "./pages/LuckyDraw";
 import WinnerHistory from "./pages/WinnerHistory";
@@ -18,6 +19,7 @@ function App() {
     pathname === "/admin/lucky-draw" ||
     pathname === "/admin/occasions" ||
     pathname === "/admin/customers" ||
+    pathname === "/admin/enquiries" ||
     pathname === "/admin/winner-history";
 
   useEffect(() => {
@@ -32,6 +34,9 @@ function App() {
     }
     if (pathname === "/admin/customers") {
       return <AdminCustomers />;
+    }
+    if (pathname === "/admin/enquiries") {
+      return <AdminEnquiries />;
     }
     if (pathname === "/admin/occasions") {
       return <AdminOccasions />;
