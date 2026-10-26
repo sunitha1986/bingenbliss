@@ -17,18 +17,18 @@
     "isDrawing": false,
     "drawingUntil": 0,
     "drawingWinner": {
-      "id": "15",
-      "Name": "sreehan",
-      "Phone": "9898766756",
+      "id": "13",
+      "Name": "Sunitha Rao G",
+      "Phone": "9177921194",
       "Occasion": "Birthday party",
-      "Celebration date": "2026-10-26",
-      "Date of birth": "2026-10-26",
-      "Guests": 8,
+      "Celebration date": "2026-10-29",
+      "Date of birth": "2026-10-29",
+      "Guests": 2,
       "Consent": "Yes",
-      "Submitted at": "2026-10-07T05:05:00.000Z"
+      "Submitted at": "2026-10-05T06:46:25.734Z"
     },
     "autoResetVisibilityAt": 0,
-    "nextDrawDate": "2026-10-23",
-    "drawDate": "2026-10-23"
+    "nextDrawDate": "2026-11-23",
+    "drawDate": "2026-11-23"
   }
 }

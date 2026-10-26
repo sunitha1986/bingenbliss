@@ -309,24 +309,21 @@ setMessage("");
                             key={`empty-${index}`}
                           />
                         ))}
-                        {calendarDays.map(({ date, day, dateValue }) =>
-                          dateValue < minimumEventDate ? (
-                            <span
-                              aria-hidden="true"
-                              className="enquiry-date-empty"
-                              key={dateValue}
-                            />
-                          ) : (
+                        {calendarDays.map(({ date, day, dateValue }) => {
+                          const isPastDate = dateValue < minimumEventDate;
+                          return (
                             <button
                               aria-label={date.toLocaleDateString(undefined, {
                                 dateStyle: "full",
                               })}
                               aria-pressed={form.eventDate === dateValue}
-                              className={
-                                form.eventDate === dateValue
-                                  ? "is-selected"
-                                  : undefined
-                              }
+                              className={[
+                                isPastDate ? "is-disabled" : "",
+                                form.eventDate === dateValue ? "is-selected" : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              disabled={isPastDate}
                               key={dateValue}
                               onClick={() => {
                                 setForm((previous) => ({
@@ -340,8 +337,8 @@ setMessage("");
                             >
                               {day}
                             </button>
-                          ),
-                        )}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

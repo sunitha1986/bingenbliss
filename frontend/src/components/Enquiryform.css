@@ -135,6 +135,13 @@
   background: #f7e8f3;
 }
 
+.enquiry-date-calendar-grid button:disabled,
+.enquiry-date-calendar-grid button:disabled:hover {
+  background: transparent;
+  color: #c7c0c5;
+  cursor: not-allowed;
+}
+
 .enquiry-date-calendar-header button:disabled {
   color: #c7c0c5;
   cursor: not-allowed;
